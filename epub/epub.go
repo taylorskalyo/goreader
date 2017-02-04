@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"encoding/xml"
 	"io"
-	"log"
 )
 
 const ContainerPath = "META-INF/container.xml"
@@ -33,36 +32,36 @@ type Container struct {
 
 // Package represents an epub content.opf file.
 type Package struct {
-	Metadata Metadata `xml:"metadata"`
-	Manifest Manifest `xml:"manifest"`
-	Spine    Spine    `xml:"spine"`
+	Metadata
+	Manifest
+	Spine
 }
 
 // Metadata contains publishing information about the epub.
 type Metadata struct {
-	Title       string `xml:"title"`
-	Language    string `xml:"language"`
-	Identifier  string `xml:"idenifier"`
-	Creator     string `xml:"creator"`
-	Contributor string `xml:"contributor"`
-	Publisher   string `xml:"publisher"`
-	Subject     string `xml:"subject"`
-	Description string `xml:"description"`
+	Title       string `xml:"metadata>title"`
+	Language    string `xml:"metadata>language"`
+	Identifier  string `xml:"metadata>idenifier"`
+	Creator     string `xml:"metadata>creator"`
+	Contributor string `xml:"metadata>contributor"`
+	Publisher   string `xml:"metadata>publisher"`
+	Subject     string `xml:"metadata>subject"`
+	Description string `xml:"metadata>description"`
 	Event       []struct {
 		Name string `xml:"event,attr"`
 		Date string `xml:",innerxml"`
-	} `xml:"date"`
-	Type     string `xml:"type"`
-	Format   string `xml:"format"`
-	Source   string `xml:"source"`
-	Relation string `xml:"relation"`
-	Coverage string `xml:"coverage"`
-	Rights   string `xml:"rights"`
+	} `xml:"metadata>date"`
+	Type     string `xml:"metadata>type"`
+	Format   string `xml:"metadata>format"`
+	Source   string `xml:"metadata>source"`
+	Relation string `xml:"metadata>relation"`
+	Coverage string `xml:"metadata>coverage"`
+	Rights   string `xml:"metadata>rights"`
 }
 
 // Manifest lists every file that is part of the epub.
 type Manifest struct {
-	Items []Item `xml:"item"`
+	Items []Item `xml:"manifest>item"`
 }
 
 // Item represents a file stored in the epub.
@@ -74,7 +73,7 @@ type Item struct {
 
 // Spine defines the reading order of the epub documents.
 type Spine struct {
-	Itemrefs []Itemref `xml:"itemref"`
+	Itemrefs []Itemref `xml:"spine>itemref"`
 }
 
 // Itemref points to an Item.
@@ -121,12 +120,15 @@ func (r *Reader) init(z *zip.Reader) error {
 		r.files[f.Name] = f
 	}
 
-	r.setContainer()
-	r.setPackages()
-	r.setItems()
-	for _, rf := range r.Container.Rootfiles {
-		log.Printf("%+v\n", rf)
+	err := r.setContainer()
+	if err != nil {
+		return err
 	}
+	err = r.setPackages()
+	if err != nil {
+		return err
+	}
+	r.setItems()
 
 	return nil
 }
