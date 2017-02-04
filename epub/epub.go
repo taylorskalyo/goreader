@@ -8,56 +8,83 @@ import (
 	"log"
 )
 
+const ContainerPath = "META-INF/container.xml"
+
 type Reader struct {
-	Contents []Content
+	Container
+	files map[string]*zip.File
 }
 
 type ReadCloser struct {
-	z *zip.ReadCloser
 	Reader
+	z *zip.ReadCloser
 }
 
-type Chapter struct {
-	Title string
-	f     zip.File
-}
-
-type rootfile struct {
+// Rootfile contains the location of a content.opf package file.
+type Rootfile struct {
 	FullPath string `xml:"full-path,attr"`
+	Package
 }
 
-type container struct {
-	XMLName   xml.Name   `xml:"container"`
-	Rootfiles []rootfile `xml:"rootfiles>rootfile"`
+// Container serves as a directory of Rootfiles.
+type Container struct {
+	Rootfiles []*Rootfile `xml:"rootfiles>rootfile"`
 }
 
-type Content struct {
-	XMLName xml.Name `xml:"package"`
-	Metadata
-	Manifest
-	Spine
+// Package represents an epub content.opf file.
+type Package struct {
+	Metadata Metadata `xml:"metadata"`
+	Manifest Manifest `xml:"manifest"`
+	Spine    Spine    `xml:"spine"`
 }
 
+// Metadata contains publishing information about the epub.
 type Metadata struct {
+	Title       string `xml:"title"`
+	Language    string `xml:"language"`
+	Identifier  string `xml:"idenifier"`
+	Creator     string `xml:"creator"`
+	Contributor string `xml:"contributor"`
+	Publisher   string `xml:"publisher"`
+	Subject     string `xml:"subject"`
+	Description string `xml:"description"`
+	Event       []struct {
+		Name string `xml:"event,attr"`
+		Date string `xml:",innerxml"`
+	} `xml:"date"`
+	Type     string `xml:"type"`
+	Format   string `xml:"format"`
+	Source   string `xml:"source"`
+	Relation string `xml:"relation"`
+	Coverage string `xml:"coverage"`
+	Rights   string `xml:"rights"`
 }
 
+// Manifest lists every file that is part of the epub.
 type Manifest struct {
-	Items []item `xml:"manifest>item"`
+	Items []Item `xml:"item"`
 }
 
-type item struct {
+// Item represents a file stored in the epub.
+type Item struct {
 	ID   string `xml:"id,attr"`
 	HREF string `xml:"href,attr"`
+	f    *zip.File
 }
 
+// Spine defines the reading order of the epub documents.
 type Spine struct {
-	ItemRefs []itemref `xml:"spine>itemref"`
+	Itemrefs []Itemref `xml:"itemref"`
 }
 
-type itemref struct {
+// Itemref points to an Item.
+type Itemref struct {
 	IDREF string `xml:"idref,attr"`
+	Item  *Item
 }
 
+// OpenReader will open the epub file specified by name and return a
+// ReadCloser.
 func OpenReader(name string) (*ReadCloser, error) {
 	z, err := zip.OpenReader(name)
 	if err != nil {
@@ -72,6 +99,8 @@ func OpenReader(name string) (*ReadCloser, error) {
 	return rc, nil
 }
 
+// NewReader returns a new Reader reading from r, which is assumed to have the
+// given size in bytes.
 func NewReader(ra io.ReaderAt, size int64) (*Reader, error) {
 	z, err := zip.NewReader(ra, size)
 	if err != nil {
@@ -86,47 +115,47 @@ func NewReader(ra io.ReaderAt, size int64) (*Reader, error) {
 }
 
 func (r *Reader) init(z *zip.Reader) error {
-	files := make(map[string]*zip.File)
+	// Create a file lookup table
+	r.files = make(map[string]*zip.File)
 	for _, f := range z.File {
-		files[f.Name] = f
+		r.files[f.Name] = f
 	}
 
-	r.setContents(files)
-	log.Printf("%+v\n", r.Contents)
+	r.setContainer()
+	r.setPackages()
+	r.setItems()
+	for _, rf := range r.Container.Rootfiles {
+		log.Printf("%+v\n", rf)
+	}
 
 	return nil
 }
 
-func (r *Reader) rootfiles(files map[string]*zip.File) (rf []rootfile, err error) {
-	f, err := files["META-INF/container.xml"].Open()
+// setContainer unmarshals the epub's container.xml file.
+func (r *Reader) setContainer() error {
+	f, err := r.files[ContainerPath].Open()
 	if err != nil {
-		return
+		return err
 	}
 
 	var b bytes.Buffer
 	_, err = io.Copy(&b, f)
 	if err != nil {
-		return
+		return err
 	}
 
-	var c container
-	err = xml.Unmarshal(b.Bytes(), &c)
-	if err != nil {
-		return
-	}
-	log.Printf("%+v\n", c)
-
-	return c.Rootfiles, nil
-}
-
-func (r *Reader) setContents(files map[string]*zip.File) error {
-	rfs, err := r.rootfiles(files)
+	err = xml.Unmarshal(b.Bytes(), &r.Container)
 	if err != nil {
 		return err
 	}
 
-	for _, rf := range rfs {
-		f, err := files[rf.FullPath].Open()
+	return nil
+}
+
+// setPackages unmarshal's each of the epub's container.opf files.
+func (r *Reader) setPackages() error {
+	for _, rf := range r.Container.Rootfiles {
+		f, err := r.files[rf.FullPath].Open()
 		if err != nil {
 			return err
 		}
@@ -137,23 +166,32 @@ func (r *Reader) setContents(files map[string]*zip.File) error {
 			return err
 		}
 
-		var c Content
-		err = xml.Unmarshal(b.Bytes(), &c)
+		err = xml.Unmarshal(b.Bytes(), &rf.Package)
 		if err != nil {
 			return err
 		}
-
-		r.Contents = append(r.Contents, c)
 	}
 
 	return nil
 }
 
-func (rc *ReadCloser) Close() {
-	rc.z.Close()
+// setItems associates Itemrefs with their respective Item and Items with
+// their zip.File.
+func (r *Reader) setItems() {
+	for _, rf := range r.Container.Rootfiles {
+		itemMap := make(map[string]*Item)
+		for i, item := range rf.Manifest.Items {
+			rf.Manifest.Items[i].f = r.files[item.HREF]
+			itemMap[item.ID] = &rf.Manifest.Items[i]
+		}
+
+		for i, itemref := range rf.Spine.Itemrefs {
+			rf.Spine.Itemrefs[i].Item = itemMap[itemref.IDREF]
+		}
+	}
 }
 
-func (c *Chapter) Open() (io.ReadCloser, error) {
-	// TODO pull out just the text
-	return c.f.Open()
+// Close closes the epub file, rendering it unusable for I/O.
+func (rc *ReadCloser) Close() {
+	rc.z.Close()
 }
