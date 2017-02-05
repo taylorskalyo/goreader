@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/xml"
 	"errors"
+	"fmt"
 	"io"
 	"path"
 	"strings"
@@ -92,7 +93,7 @@ type Spine struct {
 // Itemref points to an Item.
 type Itemref struct {
 	IDREF string `xml:"idref,attr"`
-	Item  *Item
+	*Item
 }
 
 // OpenReader will open the epub file specified by name and return a
@@ -234,11 +235,11 @@ func (r *Reader) setItems() error {
 
 // Text returns a bytes.Buffer representing the plain text contents of an item.
 // For non-xml/html items or items whose file contents are missing, the buffer
-// will contain no text.
+// will contain no text. Alt text will be used in place of images when
+// available.
 func (item *Item) Text() (buf bytes.Buffer, err error) {
-	if !(strings.Contains(item.MediaType, "xml") ||
-		strings.Contains(item.MediaType, "html") ||
-		item.f == nil) {
+	isText := strings.Contains(item.MediaType, "xml") || strings.Contains(item.MediaType, "html")
+	if !isText || item.f == nil {
 		_, err = buf.WriteString("")
 		return
 	}
@@ -249,6 +250,7 @@ func (item *Item) Text() (buf bytes.Buffer, err error) {
 	}
 	defer rc.Close()
 
+	var elStack []string
 	t := html.NewTokenizer(rc)
 	for {
 		switch t.Next() {
@@ -257,11 +259,33 @@ func (item *Item) Text() (buf bytes.Buffer, err error) {
 				return
 			}
 			return buf, nil
+		case html.StartTagToken:
+			elStack = append(elStack, t.Token().Data) // push element
+			fallthrough
+		case html.SelfClosingTagToken:
+			// Display alt text in place of image
+			token := t.Token()
+			if token.Data == "img" {
+				for _, a := range token.Attr {
+					if a.Key == "alt" {
+						_, err := buf.Write([]byte(fmt.Sprintf("\nImage alt text: %s\n", a.Val)))
+						if err != nil {
+							return buf, err
+						}
+					}
+				}
+			}
 		case html.TextToken:
+			// Skip style tags
+			if len(elStack) > 0 && elStack[len(elStack)-1] == "style" {
+				break
+			}
 			_, err = buf.Write(t.Text())
 			if err != nil {
 				return
 			}
+		case html.EndTagToken:
+			elStack = elStack[:len(elStack)-1] // pop element
 		}
 	}
 }
