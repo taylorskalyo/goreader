@@ -53,17 +53,16 @@ func main() {
 
 	title := views.NewTextBar()
 	title.SetStyle(tcell.StyleDefault.
-		Foreground(tcell.ColorBlack).
-		Background(tcell.ColorYellow))
+		Foreground(tcell.ColorWhite).
+		Background(tcell.ColorBlack))
 	title.SetCenter(book.Rootfiles[0].Title, tcell.StyleDefault)
-	page := views.NewText()
+	page := views.NewTextArea()
 
-	page.SetText("book contents")
+	text, err := book.Rootfiles[0].Spine.Itemrefs[0].Text()
+	page.SetContent(text.String())
 	page.SetStyle(tcell.StyleDefault.
 		Foreground(tcell.ColorBlack).
 		Background(tcell.ColorWhite))
-
-	page.SetAlignment(views.VAlignTop | views.HAlignLeft)
 
 	box.SetOrientation(views.Vertical)
 	box.AddWidget(title, 0)
