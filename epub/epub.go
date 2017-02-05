@@ -322,8 +322,6 @@ func htmlToText(r io.Reader, buf *bytes.Buffer) error {
 			elStack = elStack[:len(elStack)-1] // pop element
 		}
 	}
-
-	return nil
 }
 
 // Close closes the epub file, rendering it unusable for I/O.
