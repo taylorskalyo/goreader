@@ -5,6 +5,10 @@ import (
 	"bytes"
 	"encoding/xml"
 	"io"
+	"path"
+	"strings"
+
+	"golang.org/x/net/html"
 )
 
 const ContainerPath = "META-INF/container.xml"
@@ -66,9 +70,10 @@ type Manifest struct {
 
 // Item represents a file stored in the epub.
 type Item struct {
-	ID   string `xml:"id,attr"`
-	HREF string `xml:"href,attr"`
-	f    *zip.File
+	ID        string `xml:"id,attr"`
+	HREF      string `xml:"href,attr"`
+	MediaType string `xml:"media-type,attr"`
+	f         *zip.File
 }
 
 // Spine defines the reading order of the epub documents.
@@ -183,7 +188,8 @@ func (r *Reader) setItems() {
 	for _, rf := range r.Container.Rootfiles {
 		itemMap := make(map[string]*Item)
 		for i, item := range rf.Manifest.Items {
-			rf.Manifest.Items[i].f = r.files[item.HREF]
+			abs := path.Join(path.Dir(rf.FullPath), item.HREF)
+			rf.Manifest.Items[i].f = r.files[abs]
 			itemMap[item.ID] = &rf.Manifest.Items[i]
 		}
 
@@ -191,6 +197,33 @@ func (r *Reader) setItems() {
 			rf.Spine.Itemrefs[i].Item = itemMap[itemref.IDREF]
 		}
 	}
+}
+
+// Text returns a bytes.Buffer representing the plain text content of an item.
+// For non-xml/html items, the buffer will contain no text.
+func (item *Item) Text() (buf bytes.Buffer, err error) {
+	if !(strings.Contains(item.MediaType, "xml") || strings.Contains(item.MediaType, "html")) {
+		buf.WriteString("")
+		return
+	}
+
+	rc, err := item.f.Open()
+	if err != nil {
+		return
+	}
+	defer rc.Close()
+
+	t := html.NewTokenizer(rc)
+	for {
+		switch t.Next() {
+		case html.ErrorToken:
+			return buf, nil
+		case html.TextToken:
+			buf.Write(t.Text())
+		}
+	}
+
+	return buf, nil
 }
 
 // Close closes the epub file, rendering it unusable for I/O.
