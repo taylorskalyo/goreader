@@ -2,8 +2,24 @@ package epub
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
+
+const expFormat = "Expected: %v, but got: %v\n"
+
+type containerTest struct {
+	*testing.T
+	c Container
+}
+
+type itemTest struct {
+	*testing.T
+	item    Item
+	expID   string
+	expHREF string
+	expText string
+}
 
 func TestOpenReader(t *testing.T) {
 	r, err := OpenReader("_test_files/alice.epub")
@@ -11,6 +27,11 @@ func TestOpenReader(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer r.Close()
+
+	t.Run("ReadCloser", func(t *testing.T) {
+		tt := containerTest{t, r.Container}
+		tt.TestContainer()
+	})
 }
 
 func TestNewReader(t *testing.T) {
@@ -23,58 +44,108 @@ func TestNewReader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = NewReader(rc, fi.Size())
+	r, err := NewReader(rc, fi.Size())
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	t.Run("Reader", func(t *testing.T) {
+		tt := containerTest{t, r.Container}
+		tt.TestContainer()
+	})
+}
+
+func (ct *containerTest) TestContainer() {
+	ct.Run("Container", func(t *testing.T) {
+		tt := containerTest{t, ct.c}
+		tt.TestMetadata()
+		tt.TestSpine()
+		tt.TestManifest()
+	})
+}
+
+func (ct *containerTest) TestMetadata() {
+	meta := ct.c.Rootfiles[0].Metadata
+
+	exp := "Alice's Adventures in Wonderland / Illustrated by Arthur Rackham. With a Proem by Austin Dobson"
+	if meta.Title != exp {
+		ct.Errorf(expFormat, exp, meta.Title)
+	}
+
+	exp = "Lewis Carroll"
+	if meta.Creator != exp {
+		ct.Errorf(expFormat, exp, meta.Creator)
 	}
 }
 
-func TestMetadata(t *testing.T) {
-	r, err := OpenReader("_test_files/alice.epub")
-	if err != nil {
-		t.Fatal(err)
+func (ct *containerTest) TestSpine() {
+	testCases := []struct {
+		itemrefIndex int
+		expIDREF     string
+	}{
+		{0, "coverpage-wrapper"},
+		{1, "item41"},
 	}
-	defer r.Close()
 
-	meta := r.Container.Rootfiles[0].Metadata
-	if meta.Title != "Alice's Adventures in Wonderland / Illustrated by Arthur Rackham. With a Proem by Austin Dobson" {
-		t.Fatalf("Unexpected title: %s\n", meta.Title)
-	}
-	if meta.Creator != "Lewis Carroll" {
-		t.Fatalf("Unexpected creator: %s\n", meta.Creator)
+	spine := ct.c.Rootfiles[0].Spine
+	for _, tc := range testCases {
+		ct.Run("Item", func(t *testing.T) {
+			itemref := spine.Itemrefs[tc.itemrefIndex]
+			if itemref.IDREF != tc.expIDREF {
+				t.Errorf(expFormat, tc.expIDREF, itemref.IDREF)
+			}
+
+			if itemref.Item == nil {
+				t.Errorf(expFormat, "not nil", "nil")
+			} else if itemref.Item.ID != tc.expIDREF {
+				t.Errorf(expFormat, tc.expIDREF, itemref.Item.ID)
+			}
+		})
 	}
 }
 
-func TestSpine(t *testing.T) {
-	r, err := OpenReader("_test_files/alice.epub")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer r.Close()
-
-	spine := r.Container.Rootfiles[0].Spine
-	if spine.Itemrefs[0].IDREF != "coverpage-wrapper" {
-		t.Fatalf("Unexpected IDREF: %s\n", spine.Itemrefs[0].IDREF)
-	}
-
-	if spine.Itemrefs[0].Item.ID != "coverpage-wrapper" {
-		t.Fatalf("Unexpected ID: %s\n", spine.Itemrefs[0].Item.ID)
-	}
-}
-
-func TestManifest(t *testing.T) {
-	r, err := OpenReader("_test_files/alice.epub")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer r.Close()
-
-	manifest := r.Container.Rootfiles[0].Manifest
-	if manifest.Items[0].ID != "item1" {
-		t.Fatalf("Unexpected ID: %s\n", manifest.Items[0].ID)
+func (ct *containerTest) TestManifest() {
+	testCases := []struct {
+		itemIndex int
+		expID     string
+		expHREF   string
+		expText   string
+	}{
+		{
+			40,
+			"item41",
+			"@public@vhost@g@gutenberg@html@files@28885@28885-h@28885-h-0.htm.html",
+			"Tis two score years since Carroll's art",
+		},
+		{
+			0,
+			"item1",
+			"@public@vhost@g@gutenberg@html@files@28885@28885-h@images@cover.jpg",
+			"",
+		},
 	}
 
-	if manifest.Items[0].HREF != "@public@vhost@g@gutenberg@html@files@28885@28885-h@images@cover.jpg" {
-		t.Fatalf("Unexpected HREF: %s\n", manifest.Items[0].HREF)
+	manifest := ct.c.Rootfiles[0].Manifest
+	for _, tc := range testCases {
+		ct.Run("Item", func(t *testing.T) {
+			item := manifest.Items[tc.itemIndex]
+
+			if item.ID != tc.expID {
+				t.Errorf(expFormat, tc.expID, item.ID)
+			}
+
+			if item.HREF != tc.expHREF {
+				t.Errorf(expFormat, tc.expHREF, item.HREF)
+			}
+
+			text, err := item.Text()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if !strings.Contains(text.String(), tc.expText) {
+				t.Errorf(expFormat, tc.expText, text.String())
+			}
+		})
 	}
 }
