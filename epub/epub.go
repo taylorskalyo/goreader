@@ -7,29 +7,43 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path"
 	"strings"
 
 	"golang.org/x/net/html"
 )
 
-const ContainerPath = "META-INF/container.xml"
+const containerPath = "META-INF/container.xml"
 
 var (
-	ErrNoRootfile  = errors.New("epub: no rootfile found in container")
+	// ErrNoRootfile occurs when there are no rootfile entries found in
+	// container.xml.
+	ErrNoRootfile = errors.New("epub: no rootfile found in container")
+
+	// ErrBadRootfile occurs when container.xml references a rootfile that does
+	// not exist in the zip.
 	ErrBadRootfile = errors.New("epub: container references non-existent rootfile")
-	ErrNoItemref   = errors.New("epub: no itemrefs found in spine")
-	ErrBadItemref  = errors.New("epub: itemref references non-existent item")
+
+	// ErrNoItemref occurrs when a content.opf contains a spine without any
+	// itemref entries.
+	ErrNoItemref = errors.New("epub: no itemrefs found in spine")
+
+	// ErrBadItemref occurs when an itemref entry in content.opf references an
+	// item that does not exist in the manifest.
+	ErrBadItemref = errors.New("epub: itemref references non-existent item")
 )
 
+// Reader represents a readable epub file.
 type Reader struct {
 	Container
 	files map[string]*zip.File
 }
 
+// ReadCloser represents a readable epub file that can be closed.
 type ReadCloser struct {
 	Reader
-	z *zip.ReadCloser
+	f *os.File
 }
 
 // Rootfile contains the location of a content.opf package file.
@@ -99,16 +113,29 @@ type Itemref struct {
 // OpenReader will open the epub file specified by name and return a
 // ReadCloser.
 func OpenReader(name string) (*ReadCloser, error) {
-	z, err := zip.OpenReader(name)
+	f, err := os.Open(name)
 	if err != nil {
 		return nil, err
 	}
 
 	rc := new(ReadCloser)
-	rc.z = z
-	if err = rc.init(&z.Reader); err != nil {
+	rc.f = f
+
+	fi, err := f.Stat()
+	if err != nil {
+		f.Close()
 		return nil, err
 	}
+
+	z, err := zip.NewReader(f, fi.Size())
+	if err != nil {
+		return nil, err
+	}
+
+	if err = rc.init(z); err != nil {
+		return nil, err
+	}
+
 	return rc, nil
 }
 
@@ -124,6 +151,7 @@ func NewReader(ra io.ReaderAt, size int64) (*Reader, error) {
 	if err = r.init(z); err != nil {
 		return nil, err
 	}
+
 	return r, nil
 }
 
@@ -152,7 +180,7 @@ func (r *Reader) init(z *zip.Reader) error {
 
 // setContainer unmarshals the epub's container.xml file.
 func (r *Reader) setContainer() error {
-	f, err := r.files[ContainerPath].Open()
+	f, err := r.files[containerPath].Open()
 	if err != nil {
 		return err
 	}
@@ -292,5 +320,5 @@ func (item *Item) Text() (buf bytes.Buffer, err error) {
 
 // Close closes the epub file, rendering it unusable for I/O.
 func (rc *ReadCloser) Close() {
-	rc.z.Close()
+	rc.f.Close()
 }
