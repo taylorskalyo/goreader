@@ -199,10 +199,13 @@ func (r *Reader) setItems() {
 	}
 }
 
-// Text returns a bytes.Buffer representing the plain text content of an item.
-// For non-xml/html items, the buffer will contain no text.
+// Text returns a bytes.Buffer representing the plain text contents of an item.
+// For non-xml/html items or items whose file contents are missing, the buffer
+// will contain no text.
 func (item *Item) Text() (buf bytes.Buffer, err error) {
-	if !(strings.Contains(item.MediaType, "xml") || strings.Contains(item.MediaType, "html")) {
+	if !(strings.Contains(item.MediaType, "xml") ||
+		strings.Contains(item.MediaType, "html") ||
+		item.f == nil) {
 		buf.WriteString("")
 		return
 	}

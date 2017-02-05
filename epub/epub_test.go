@@ -67,7 +67,8 @@ func (ct *containerTest) TestContainer() {
 func (ct *containerTest) TestMetadata() {
 	meta := ct.c.Rootfiles[0].Metadata
 
-	exp := "Alice's Adventures in Wonderland / Illustrated by Arthur Rackham. With a Proem by Austin Dobson"
+	exp := "Alice's Adventures in Wonderland / Illustrated by Arthur Rackham. " +
+		"With a Proem by Austin Dobson"
 	if meta.Title != exp {
 		ct.Errorf(expFormat, exp, meta.Title)
 	}
