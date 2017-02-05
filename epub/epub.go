@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/xml"
+	"errors"
 	"io"
 	"path"
 	"strings"
@@ -12,6 +13,13 @@ import (
 )
 
 const ContainerPath = "META-INF/container.xml"
+
+var (
+	ErrNoRootfile  = errors.New("epub: no rootfile found in container")
+	ErrBadRootfile = errors.New("epub: container references non-existent rootfile")
+	ErrNoItemref   = errors.New("epub: no itemrefs found in spine")
+	ErrBadItemref  = errors.New("epub: itemref references non-existent item")
+)
 
 type Reader struct {
 	Container
@@ -133,7 +141,10 @@ func (r *Reader) init(z *zip.Reader) error {
 	if err != nil {
 		return err
 	}
-	r.setItems()
+	err = r.setItems()
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -156,12 +167,20 @@ func (r *Reader) setContainer() error {
 		return err
 	}
 
+	if len(r.Container.Rootfiles) < 1 {
+		return ErrNoRootfile
+	}
+
 	return nil
 }
 
-// setPackages unmarshal's each of the epub's container.opf files.
+// setPackages unmarshal's each of the epub's content.opf files.
 func (r *Reader) setPackages() error {
 	for _, rf := range r.Container.Rootfiles {
+		if r.files[rf.FullPath] == nil {
+			return ErrBadRootfile
+		}
+
 		f, err := r.files[rf.FullPath].Open()
 		if err != nil {
 			return err
@@ -184,19 +203,33 @@ func (r *Reader) setPackages() error {
 
 // setItems associates Itemrefs with their respective Item and Items with
 // their zip.File.
-func (r *Reader) setItems() {
+func (r *Reader) setItems() error {
+	itemrefCount := 0
 	for _, rf := range r.Container.Rootfiles {
 		itemMap := make(map[string]*Item)
-		for i, item := range rf.Manifest.Items {
+		for i := range rf.Manifest.Items {
+			item := &rf.Manifest.Items[i]
+			itemMap[item.ID] = item
+
 			abs := path.Join(path.Dir(rf.FullPath), item.HREF)
-			rf.Manifest.Items[i].f = r.files[abs]
-			itemMap[item.ID] = &rf.Manifest.Items[i]
+			item.f = r.files[abs]
 		}
 
-		for i, itemref := range rf.Spine.Itemrefs {
-			rf.Spine.Itemrefs[i].Item = itemMap[itemref.IDREF]
+		for i := range rf.Spine.Itemrefs {
+			itemref := &rf.Spine.Itemrefs[i]
+			itemref.Item = itemMap[itemref.IDREF]
+			if itemref.Item == nil {
+				return ErrBadItemref
+			}
 		}
+		itemrefCount += len(rf.Spine.Itemrefs)
 	}
+
+	if itemrefCount < 1 {
+		return ErrNoItemref
+	}
+
+	return nil
 }
 
 // Text returns a bytes.Buffer representing the plain text contents of an item.
@@ -206,7 +239,7 @@ func (item *Item) Text() (buf bytes.Buffer, err error) {
 	if !(strings.Contains(item.MediaType, "xml") ||
 		strings.Contains(item.MediaType, "html") ||
 		item.f == nil) {
-		buf.WriteString("")
+		_, err = buf.WriteString("")
 		return
 	}
 
@@ -220,13 +253,17 @@ func (item *Item) Text() (buf bytes.Buffer, err error) {
 	for {
 		switch t.Next() {
 		case html.ErrorToken:
+			if err = t.Err(); err != io.EOF {
+				return
+			}
 			return buf, nil
 		case html.TextToken:
-			buf.Write(t.Text())
+			_, err = buf.Write(t.Text())
+			if err != nil {
+				return
+			}
 		}
 	}
-
-	return buf, nil
 }
 
 // Close closes the epub file, rendering it unusable for I/O.
