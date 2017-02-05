@@ -278,15 +278,21 @@ func (item *Item) Text() (buf bytes.Buffer, err error) {
 	}
 	defer rc.Close()
 
+	err = htmlToText(rc, &buf)
+
+	return
+}
+
+func htmlToText(r io.Reader, buf *bytes.Buffer) error {
 	var elStack []string
-	t := html.NewTokenizer(rc)
+	t := html.NewTokenizer(r)
 	for {
 		switch t.Next() {
 		case html.ErrorToken:
-			if err = t.Err(); err != io.EOF {
-				return
+			if err := t.Err(); err != io.EOF {
+				return err
 			}
-			return buf, nil
+			return nil
 		case html.StartTagToken:
 			elStack = append(elStack, t.Token().Data) // push element
 			fallthrough
@@ -298,7 +304,7 @@ func (item *Item) Text() (buf bytes.Buffer, err error) {
 					if a.Key == "alt" {
 						_, err := buf.Write([]byte(fmt.Sprintf("\nImage alt text: %s\n", a.Val)))
 						if err != nil {
-							return buf, err
+							return err
 						}
 					}
 				}
@@ -308,14 +314,16 @@ func (item *Item) Text() (buf bytes.Buffer, err error) {
 			if len(elStack) > 0 && elStack[len(elStack)-1] == "style" {
 				break
 			}
-			_, err = buf.Write(t.Text())
+			_, err := buf.Write(t.Text())
 			if err != nil {
-				return
+				return err
 			}
 		case html.EndTagToken:
 			elStack = elStack[:len(elStack)-1] // pop element
 		}
 	}
+
+	return nil
 }
 
 // Close closes the epub file, rendering it unusable for I/O.
