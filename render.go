@@ -14,7 +14,7 @@ type renderer struct {
 	b       bytes.Buffer
 }
 
-func Render(r io.Reader) (bytes.Buffer, error) {
+func render(r io.Reader) (bytes.Buffer, error) {
 	t := html.NewTokenizer(r)
 	re := renderer{t: t}
 	err := re.parse(r)
