@@ -139,7 +139,7 @@ func OpenReader(name string) (*ReadCloser, error) {
 	return rc, nil
 }
 
-// NewReader returns a new Reader reading from r, which is assumed to have the
+// NewReader returns a new Reader reading from ra, which is assumed to have the
 // given size in bytes.
 func NewReader(ra io.ReaderAt, size int64) (*Reader, error) {
 	z, err := zip.NewReader(ra, size)
@@ -261,8 +261,8 @@ func (r *Reader) setItems() error {
 	return nil
 }
 
-// Open returns a ReadCloser that provides access to the File's contents.
-// Multiple files may be read concurrently.
+// Open returns a ReadCloser that provides access to the Items's contents.
+// Multiple items may be read concurrently.
 func (item *Item) Open() (r io.ReadCloser, err error) {
 	if item.f == nil {
 		return nil, ErrBadManifest
