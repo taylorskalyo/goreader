@@ -14,6 +14,8 @@ type renderer struct {
 	b       bytes.Buffer
 }
 
+// render takes in html content via an io.Reader and returns a buffer
+// containing only plain text.
 func render(r io.Reader) (bytes.Buffer, error) {
 	t := html.NewTokenizer(r)
 	re := renderer{t: t}
@@ -24,6 +26,7 @@ func render(r io.Reader) (bytes.Buffer, error) {
 	return re.b, nil
 }
 
+// parse walks an html document and appends text elements to a buffer.
 func (re *renderer) parse(io.Reader) (err error) {
 	for {
 		switch re.t.Next() {
@@ -47,6 +50,8 @@ func (re *renderer) parse(io.Reader) (err error) {
 	}
 }
 
+// handleText appends text elements to the renderer buffer. It filters elements
+// that should not be displayed as text (e.g. style blocks).
 func (re *renderer) handleText() error {
 	// Skip style tags
 	if len(re.elStack) > 0 && re.elStack[len(re.elStack)-1] == "style" {
@@ -56,6 +61,8 @@ func (re *renderer) handleText() error {
 	return err
 }
 
+// handleTags appends text representations of non-text elements (e.g. image alt
+// tags) to the renderer buffer.
 func (re *renderer) handleTags() error {
 	token := re.t.Token()
 	// Display alt text in place of image
