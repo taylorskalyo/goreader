@@ -2,7 +2,6 @@ package epub
 
 import (
 	"os"
-	"strings"
 	"testing"
 )
 
@@ -11,14 +10,6 @@ const expFormat = "Expected: %v, but got: %v\n"
 type containerTest struct {
 	*testing.T
 	c Container
-}
-
-type itemTest struct {
-	*testing.T
-	item    Item
-	expID   string
-	expHREF string
-	expText string
 }
 
 func TestOpenReader(t *testing.T) {
@@ -109,19 +100,16 @@ func (ct *containerTest) TestManifest() {
 		itemIndex int
 		expID     string
 		expHREF   string
-		expText   string
 	}{
 		{
 			40,
 			"item41",
 			"@public@vhost@g@gutenberg@html@files@28885@28885-h@28885-h-0.htm.html",
-			"Tis two score years since Carroll's art",
 		},
 		{
 			0,
 			"item1",
 			"@public@vhost@g@gutenberg@html@files@28885@28885-h@images@cover.jpg",
-			"",
 		},
 	}
 
@@ -136,15 +124,6 @@ func (ct *containerTest) TestManifest() {
 
 			if item.HREF != tc.expHREF {
 				t.Errorf(expFormat, tc.expHREF, item.HREF)
-			}
-
-			text, err := item.Text()
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			if !strings.Contains(text.String(), tc.expText) {
-				t.Errorf(expFormat, tc.expText, text.String())
 			}
 		})
 	}

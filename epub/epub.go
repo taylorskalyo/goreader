@@ -5,13 +5,9 @@ import (
 	"bytes"
 	"encoding/xml"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"path"
-	"strings"
-
-	"golang.org/x/net/html"
 )
 
 const containerPath = "META-INF/container.xml"
@@ -32,6 +28,10 @@ var (
 	// ErrBadItemref occurs when an itemref entry in content.opf references an
 	// item that does not exist in the manifest.
 	ErrBadItemref = errors.New("epub: itemref references non-existent item")
+
+	// ErrItem occurs when a manifest in content.opf references an item that does
+	// not exist in the zip.
+	ErrBadManifest = errors.New("epub: manifest references non-existent item")
 )
 
 // Reader represents a readable epub file.
@@ -261,67 +261,12 @@ func (r *Reader) setItems() error {
 	return nil
 }
 
-// Text returns a bytes.Buffer representing the plain text contents of an item.
-// For non-xml/html items or items whose file contents are missing, the buffer
-// will contain no text. Alt text will be used in place of images when
-// available.
-func (item *Item) Text() (buf bytes.Buffer, err error) {
-	isText := strings.Contains(item.MediaType, "xml") || strings.Contains(item.MediaType, "html")
-	if !isText || item.f == nil {
-		_, err = buf.WriteString("")
-		return
+func (item *Item) Open() (r io.ReadCloser, err error) {
+	if item.f == nil {
+		return nil, ErrBadManifest
 	}
 
-	rc, err := item.f.Open()
-	if err != nil {
-		return
-	}
-	defer rc.Close()
-
-	err = htmlToText(rc, &buf)
-
-	return
-}
-
-func htmlToText(r io.Reader, buf *bytes.Buffer) error {
-	var elStack []string
-	t := html.NewTokenizer(r)
-	for {
-		switch t.Next() {
-		case html.ErrorToken:
-			if err := t.Err(); err != io.EOF {
-				return err
-			}
-			return nil
-		case html.StartTagToken:
-			elStack = append(elStack, t.Token().Data) // push element
-			fallthrough
-		case html.SelfClosingTagToken:
-			// Display alt text in place of image
-			token := t.Token()
-			if token.Data == "img" {
-				for _, a := range token.Attr {
-					if a.Key == "alt" {
-						_, err := buf.Write([]byte(fmt.Sprintf("\nImage alt text: %s\n", a.Val)))
-						if err != nil {
-							return err
-						}
-					}
-				}
-			}
-		case html.TextToken:
-			// Skip style tags
-			if len(elStack) > 0 && elStack[len(elStack)-1] == "style" {
-				break
-			}
-			_, err := buf.Write(t.Text())
-			if err != nil {
-				return err
-			}
-		case html.EndTagToken:
-			elStack = elStack[:len(elStack)-1] // pop element
-		}
-	}
+	return item.f.Open()
 }
 
 // Close closes the epub file, rendering it unusable for I/O.

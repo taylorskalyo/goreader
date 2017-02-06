@@ -58,7 +58,16 @@ func main() {
 	title.SetCenter(book.Rootfiles[0].Title, tcell.StyleDefault)
 	page := views.NewTextArea()
 
-	text, err := book.Rootfiles[0].Spine.Itemrefs[0].Text()
+	f, err := book.Rootfiles[0].Spine.Itemrefs[0].Open()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(1)
+	}
+	text, err := Render(f)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(1)
+	}
 	page.SetContent(text.String())
 	page.SetStyle(tcell.StyleDefault.
 		Foreground(tcell.ColorBlack).
