@@ -29,8 +29,8 @@ var (
 	// item that does not exist in the manifest.
 	ErrBadItemref = errors.New("epub: itemref references non-existent item")
 
-	// ErrItem occurs when a manifest in content.opf references an item that does
-	// not exist in the zip.
+	// ErrBadManifest occurs when a manifest in content.opf references an item
+	// that does not exist in the zip.
 	ErrBadManifest = errors.New("epub: manifest references non-existent item")
 )
 
@@ -261,6 +261,8 @@ func (r *Reader) setItems() error {
 	return nil
 }
 
+// Open returns a ReadCloser that provides access to the File's contents.
+// Multiple files may be read concurrently.
 func (item *Item) Open() (r io.ReadCloser, err error) {
 	if item.f == nil {
 		return nil, ErrBadManifest
