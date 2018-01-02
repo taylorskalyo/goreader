@@ -9,10 +9,9 @@ import (
 	"github.com/taylorskalyo/goreader/epub"
 )
 
-type pager struct {
-	scrollX int
-	scrollY int
-	cb      cellbuf
+type app struct {
+	pager   pager
+	book    *epub.Rootfile
 	chapter int
 }
 
@@ -37,54 +36,29 @@ func main() {
 	defer rc.Close()
 	book := rc.Rootfiles[0]
 
-	f, err := book.Spine.Itemrefs[0].Open()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
+	a := app{book: book}
+	if err := a.run(); err != nil {
 		os.Exit(1)
 	}
+}
+
+func (a *app) run() error {
+	defer termbox.Flush()
+	defer termbox.Close()
+
 	if err := termbox.Init(); err != nil {
-		os.Exit(1)
+		return err
 	}
-	cb, err := parseText(f)
-	if err != nil {
-		os.Exit(1)
+	if err := a.openChapter(); err != nil {
+		return err
 	}
-	p := pager{cb: cb, scrollX: 0, scrollY: 0}
-	if err := p.run(book); err != nil {
-		os.Exit(1)
-	}
-	termbox.Flush()
-	termbox.Close()
-}
 
-func (p pager) copyToTerm() {
-	_, height := termbox.Size()
-	for y := 0; y < height; y++ {
-		for x := 0; x < p.cb.width; x++ {
-			index := (y+p.scrollY)*p.cb.width + x
-			if index >= len(p.cb.cells) || index <= 0 {
-				continue
-			}
-			cell := p.cb.cells[index]
-			termbox.SetCell(x+p.scrollX, y, cell.Ch, cell.Fg, cell.Bg)
-		}
-	}
-}
-
-func (p *pager) draw() error {
-	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
-	p.copyToTerm()
-	return termbox.Flush()
-}
-
-func (p *pager) run(book *epub.Rootfile) error {
 	for {
-		if err := p.draw(); err != nil {
+		if err := a.pager.draw(); err != nil {
 			return err
 		}
 		switch ev := termbox.PollEvent(); ev.Type {
 		case termbox.EventKey:
-			_, height := termbox.Size()
 			switch ev.Key {
 			case termbox.KeyEsc:
 				return nil
@@ -93,61 +67,73 @@ func (p *pager) run(book *epub.Rootfile) error {
 				case 'q':
 					return nil
 				case 'j':
-					if p.scrollY < len(p.cb.cells)/p.cb.width-height {
-						p.scrollY++
-					}
+					a.pager.scrollDown()
 				case 'k':
-					if p.scrollY > 0 {
-						p.scrollY--
-					}
+					a.pager.scrollUp()
 				case 'h':
-					if p.scrollX > -p.cb.width {
-						p.scrollX--
-					}
+					a.pager.scrollLeft()
 				case 'l':
-					if p.scrollX < 0 {
-						p.scrollX++
-					}
+					a.pager.scrollRight()
 				case 'f':
-					if p.scrollY < len(p.cb.cells)/p.cb.width-height {
-						p.scrollY += height
+					if !a.pager.pageDown() {
+						if err := a.nextChapter(); err != nil {
+							return err
+						}
 					}
 				case 'b':
-					if p.scrollY > 0 {
-						p.scrollY -= height
+					if !a.pager.pageUp() {
+						if err := a.prevChapter(); err != nil {
+							return err
+						}
 					}
 				case 'L':
-					if p.chapter < len(book.Spine.Itemrefs)-1 {
-						p.scrollY = 0
-						p.scrollX = 0
-						p.chapter++
-						f, err := book.Spine.Itemrefs[p.chapter].Open()
-						if err != nil {
-							return err
-						}
-						cb, err := parseText(f)
-						if err != nil {
-							return err
-						}
-						p.cb = cb
+					if err := a.nextChapter(); err != nil {
+						return err
 					}
 				case 'H':
-					if p.chapter > 0 {
-						p.scrollY = 0
-						p.scrollX = 0
-						p.chapter--
-						f, err := book.Spine.Itemrefs[p.chapter].Open()
-						if err != nil {
-							return err
-						}
-						cb, err := parseText(f)
-						if err != nil {
-							return err
-						}
-						p.cb = cb
+					if err := a.prevChapter(); err != nil {
+						return err
 					}
 				}
 			}
 		}
 	}
+}
+
+func (a *app) openChapter() error {
+	f, err := a.book.Spine.Itemrefs[a.chapter].Open()
+	if err != nil {
+		return err
+	}
+	cb, err := parseText(f)
+	if err != nil {
+		return err
+	}
+	a.pager.cb = cb
+
+	return nil
+}
+
+func (a *app) nextChapter() error {
+	if a.chapter < len(a.book.Spine.Itemrefs)-1 {
+		a.chapter++
+		if err := a.openChapter(); err != nil {
+			return err
+		}
+		a.pager.toTop()
+	}
+
+	return nil
+}
+
+func (a *app) prevChapter() error {
+	if a.chapter > 0 {
+		a.chapter--
+		if err := a.openChapter(); err != nil {
+			return err
+		}
+		a.pager.toBottom()
+	}
+
+	return nil
 }
