@@ -5,7 +5,7 @@ import termbox "github.com/nsf/termbox-go"
 type pager struct {
 	scrollX int
 	scrollY int
-	cb      cellbuf
+	doc     cellbuf
 }
 
 // draw displays a pager's cell buffer in the terminal.
@@ -14,14 +14,14 @@ func (p pager) draw() error {
 
 	_, height := termbox.Size()
 	for y := 0; y < height; y++ {
-		for x := 0; x < p.cb.width; x++ {
-			index := (y+p.scrollY)*p.cb.width + x
-			if index >= len(p.cb.cells) || index <= 0 {
+		for x := 0; x < p.doc.width; x++ {
+			index := (y+p.scrollY)*p.doc.width + x
+			if index >= len(p.doc.cells) || index <= 0 {
 				continue
 			}
-			cell := p.cb.cells[index]
+			cell := p.doc.cells[index]
 
-			// Calling SetCell with coordinates outside of the terminal window
+			// Calling SetCell with coordinates outside of the terminal viewport
 			// results in a no-op.
 			termbox.SetCell(x+p.scrollX, y, cell.Ch, cell.Fg, cell.Bg)
 		}
@@ -109,7 +109,7 @@ func (p *pager) toTop() {
 }
 
 // toBottom set's the pager's horizontal panning distance back to zero and
-// vertical panning distance to its maximum value.
+// vertical panning distance to the last viewport page.
 func (p *pager) toBottom() {
 	_, viewHeight := termbox.Size()
 	p.scrollX = 0
@@ -123,7 +123,7 @@ func (p pager) maxScrollX() int {
 	return docWidth - viewWidth
 }
 
-// maxScrollX represents the pager's maximum vertical scroll distance.
+// maxScrollY represents the pager's maximum vertical scroll distance.
 func (p pager) maxScrollY() int {
 	_, docHeight := p.size()
 	_, viewHeight := termbox.Size()
@@ -133,8 +133,8 @@ func (p pager) maxScrollY() int {
 // size returns the width and height of the pager's underlying cell buffer
 // document.
 func (p pager) size() (int, int) {
-	height := len(p.cb.cells) / p.cb.width
-	return p.cb.width, height
+	height := len(p.doc.cells) / p.doc.width
+	return p.doc.width, height
 }
 
 // pages returns the number of times the pager's underlying cell buffer

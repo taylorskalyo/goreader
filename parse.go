@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"fmt"
 	"io"
 	"strings"
@@ -16,8 +15,7 @@ import (
 type parser struct {
 	elStack   []string
 	tokenizer *html.Tokenizer
-	buf       bytes.Buffer
-	cbuf      cellbuf
+	doc       cellbuf
 }
 
 type cellbuf struct {
@@ -28,9 +26,10 @@ type cellbuf struct {
 	row     int
 }
 
-// setCell changes a cell's attributes in the cellbuf at the given position.
+// setCell changes a cell's attributes in the cell buffer document at the given
+// position.
 func (c *cellbuf) setCell(x, y int, ch rune, fg, bg termbox.Attribute) {
-	// Grow by 1024 when out of space
+	// Grow in steps of 1024 when out of space.
 	for y*c.width+x >= len(c.cells) {
 		c.cells = append(c.cells, make([]termbox.Cell, 1024)...)
 	}
@@ -38,7 +37,8 @@ func (c *cellbuf) setCell(x, y int, ch rune, fg, bg termbox.Attribute) {
 }
 
 // scanWords is a split function for a Scanner that returns space-separated
-// words.
+// words. Unlike bufio.ScanWords(), scanWords only splits on spaces (i.e. not
+// newlines, tabs, or other whitespace).
 func scanWords(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	// Skip leading spaces.
 	start := 0
@@ -59,7 +59,8 @@ func scanWords(data []byte, atEOF bool) (advance int, token []byte, err error) {
 		}
 	}
 
-	// If we're at EOF, we have a final, non-empty, non-terminated word. Return it.
+	// If we're at EOF, we have a final, non-empty, non-terminated word. Return
+	// it.
 	if atEOF && len(data) > start {
 		return len(data), data[start:], nil
 	}
@@ -68,7 +69,7 @@ func scanWords(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	return start, nil, nil
 }
 
-// appendText appends styled text to the cellbuf.
+// appendStyledText appends styled text to the cell buffer document.
 func (c *cellbuf) appendStyledText(str string, fg, bg termbox.Attribute) {
 	if c.col < c.lmargin {
 		c.col = c.lmargin
@@ -96,7 +97,7 @@ func (c *cellbuf) appendStyledText(str string, fg, bg termbox.Attribute) {
 	}
 }
 
-// appendText appends text to the cellbuf.
+// appendText appends unstyled text to the cell buffer document.
 func (c *cellbuf) appendText(str string) {
 	c.appendStyledText(str, termbox.ColorDefault, termbox.ColorDefault)
 }
@@ -105,16 +106,16 @@ func (c *cellbuf) appendText(str string) {
 // containing only plain text.
 func parseText(r io.Reader) (cellbuf, error) {
 	tokenizer := html.NewTokenizer(r)
-	cbuf := cellbuf{width: 80}
-	p := parser{tokenizer: tokenizer, cbuf: cbuf}
+	doc := cellbuf{width: 80}
+	p := parser{tokenizer: tokenizer, doc: doc}
 	err := p.parse(r)
 	if err != nil {
-		return p.cbuf, err
+		return p.doc, err
 	}
-	return p.cbuf, nil
+	return p.doc, nil
 }
 
-// parse walks an html document and appends text elements to a buffer.
+// parse walks an html document and renders elements to a cell buffer document.
 func (p *parser) parse(io.Reader) (err error) {
 	for {
 		switch p.tokenizer.Next() {
@@ -145,24 +146,24 @@ func (p *parser) handleText() {
 	if len(p.elStack) > 0 && p.elStack[len(p.elStack)-1] == "style" {
 		return
 	}
-	p.cbuf.appendText(string(p.tokenizer.Text()))
+	p.doc.appendText(string(p.tokenizer.Text()))
 }
 
 // handleTags appends text representations of non-text elements (e.g. image alt
 // tags) to the parser buffer.
 func (p *parser) handleTags() {
 	token := p.tokenizer.Token()
-	// Display alt text in place of image
 	switch token.Data {
 	case "img":
+		// Display alt text in place of images.
 		for _, a := range token.Attr {
 			switch a.Key {
 			case "alt":
 				text := fmt.Sprintf("\nImage alt text: %s\n", a.Val)
-				p.cbuf.appendText(text)
+				p.doc.appendText(text)
 			}
 		}
 	case "br":
-		p.cbuf.appendText("\n")
+		p.doc.appendText("\n")
 	}
 }

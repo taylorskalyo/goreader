@@ -86,16 +86,16 @@ func (a *app) openChapter() error {
 	if err != nil {
 		return err
 	}
-	cb, err := parseText(f)
+	doc, err := parseText(f)
 	if err != nil {
 		return err
 	}
-	a.pager.cb = cb
+	a.pager.doc = doc
 
 	return nil
 }
 
-// prevChapter opens the next chapter and jumps to the top of the document.
+// nextChapter opens the next chapter and jumps to the top of the document.
 func (a *app) nextChapter() error {
 	if a.chapter < len(a.book.Spine.Itemrefs)-1 {
 		a.chapter++
