@@ -54,6 +54,7 @@ func (a *app) run() error {
 					if err := a.nextChapter(); err != nil {
 						return err
 					}
+					a.pager.toTop()
 				case 'b':
 					if a.pager.pageUp() {
 						continue
@@ -62,6 +63,7 @@ func (a *app) run() error {
 					if err := a.prevChapter(); err != nil {
 						return err
 					}
+					a.pager.toBottom()
 				case 'g':
 					a.pager.toTop()
 				case 'G':
@@ -70,10 +72,12 @@ func (a *app) run() error {
 					if err := a.nextChapter(); err != nil {
 						return err
 					}
+					a.pager.toTop()
 				case 'H':
 					if err := a.prevChapter(); err != nil {
 						return err
 					}
+					a.pager.toTop()
 				}
 			}
 		}
@@ -95,20 +99,19 @@ func (a *app) openChapter() error {
 	return nil
 }
 
-// nextChapter opens the next chapter and jumps to the top of the document.
+// nextChapter opens the next chapter.
 func (a *app) nextChapter() error {
 	if a.chapter < len(a.book.Spine.Itemrefs)-1 {
 		a.chapter++
 		if err := a.openChapter(); err != nil {
 			return err
 		}
-		a.pager.toTop()
 	}
 
 	return nil
 }
 
-// prevChapter opens the previous chapter and jumps to the bottom of the
+// prevChapter opens the previous chapter.
 // document.
 func (a *app) prevChapter() error {
 	if a.chapter > 0 {
@@ -116,7 +119,6 @@ func (a *app) prevChapter() error {
 		if err := a.openChapter(); err != nil {
 			return err
 		}
-		a.pager.toBottom()
 	}
 
 	return nil
