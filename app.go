@@ -15,12 +15,12 @@ type app struct {
 // run opens a book, renders its contents within the pager, and polls for
 // terminal events until an error occurs or an exit event is detected.
 func (a *app) run() error {
-	defer termbox.Flush()
-	defer termbox.Close()
-
 	if err := termbox.Init(); err != nil {
 		return err
 	}
+	defer termbox.Flush()
+	defer termbox.Close()
+
 	if err := a.openChapter(); err != nil {
 		return err
 	}
