@@ -18,10 +18,11 @@ import (
 	"github.com/taylorskalyo/goreader/epub"
 
 	"golang.org/x/net/html"
+	"golang.org/x/net/html/atom"
 )
 
 type parser struct {
-	elStack   []string
+	elStack   []atom.Atom
 	tokenizer *html.Tokenizer
 	doc       cellbuf
 	items     []epub.Item
@@ -127,16 +128,18 @@ func parseText(r io.Reader, items []epub.Item) (cellbuf, error) {
 // parse walks an html document and renders elements to a cell buffer document.
 func (p *parser) parse(io.Reader) (err error) {
 	for {
-		switch p.tokenizer.Next() {
+		tokenType := p.tokenizer.Next()
+		token := p.tokenizer.Token()
+		switch tokenType {
 		case html.ErrorToken:
 			err = p.tokenizer.Err()
 		case html.StartTagToken:
-			p.elStack = append(p.elStack, p.tokenizer.Token().Data) // push element
+			p.elStack = append(p.elStack, token.DataAtom) // push element
 			fallthrough
 		case html.SelfClosingTagToken:
-			p.handleTags()
+			p.handleStartTag(token)
 		case html.TextToken:
-			p.handleText()
+			p.handleText(token)
 		case html.EndTagToken:
 			p.elStack = p.elStack[:len(p.elStack)-1] // pop element
 		}
@@ -150,27 +153,26 @@ func (p *parser) parse(io.Reader) (err error) {
 
 // handleText appends text elements to the parser buffer. It filters elements
 // that should not be displayed as text (e.g. style blocks).
-func (p *parser) handleText() {
+func (p *parser) handleText(token html.Token) {
 	// Skip style tags
-	if len(p.elStack) > 0 && p.elStack[len(p.elStack)-1] == "style" {
+	if len(p.elStack) > 0 && p.elStack[len(p.elStack)-1] == atom.Style {
 		return
 	}
-	p.doc.appendText(string(p.tokenizer.Text()))
+	p.doc.appendText(string(token.Data))
 }
 
-// handleTags appends text representations of non-text elements (e.g. image alt
+// handleStartTag appends text representations of non-text elements (e.g. image alt
 // tags) to the parser buffer.
-func (p *parser) handleTags() {
-	token := p.tokenizer.Token()
-	switch token.Data {
-	case "img":
+func (p *parser) handleStartTag(token html.Token) {
+	switch token.DataAtom {
+	case atom.Img:
 		// Display alt text in place of images.
 		for _, a := range token.Attr {
-			switch a.Key {
-			case "alt":
+			switch atom.Lookup([]byte(a.Key)) {
+			case atom.Alt:
 				text := fmt.Sprintf("Alt text: %s\n", a.Val)
 				p.doc.appendText(text)
-			case "src":
+			case atom.Src:
 				for _, item := range p.items {
 					if item.HREF == a.Val {
 						p.doc.appendText(imageToText(item))
@@ -179,8 +181,10 @@ func (p *parser) handleTags() {
 				}
 			}
 		}
-	case "br":
+	case atom.Br:
 		p.doc.appendText("\n")
+	case atom.P:
+		p.doc.col += 2
 	}
 }
 
