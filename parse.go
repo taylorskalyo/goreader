@@ -2,12 +2,20 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
+	"image"
+	"image/color"
 	"io"
 	"strings"
 	"unicode/utf8"
 
+	_ "image/jpeg"
+	_ "image/png"
+
+	"github.com/nfnt/resize"
 	termbox "github.com/nsf/termbox-go"
+	"github.com/taylorskalyo/goreader/epub"
 
 	"golang.org/x/net/html"
 )
@@ -16,6 +24,7 @@ type parser struct {
 	elStack   []string
 	tokenizer *html.Tokenizer
 	doc       cellbuf
+	items     []epub.Item
 }
 
 type cellbuf struct {
@@ -104,10 +113,10 @@ func (c *cellbuf) appendText(str string) {
 
 // parseText takes in html content via an io.Reader and returns a buffer
 // containing only plain text.
-func parseText(r io.Reader) (cellbuf, error) {
+func parseText(r io.Reader, items []epub.Item) (cellbuf, error) {
 	tokenizer := html.NewTokenizer(r)
 	doc := cellbuf{width: 80}
-	p := parser{tokenizer: tokenizer, doc: doc}
+	p := parser{tokenizer: tokenizer, doc: doc, items: items}
 	err := p.parse(r)
 	if err != nil {
 		return p.doc, err
@@ -159,11 +168,51 @@ func (p *parser) handleTags() {
 		for _, a := range token.Attr {
 			switch a.Key {
 			case "alt":
-				text := fmt.Sprintf("\nImage alt text: %s\n", a.Val)
+				text := fmt.Sprintf("Alt text: %s\n", a.Val)
 				p.doc.appendText(text)
+			case "src":
+				for _, item := range p.items {
+					if item.HREF == a.Val {
+						p.doc.appendText(imageToText(item))
+						break
+					}
+				}
 			}
 		}
 	case "br":
 		p.doc.appendText("\n")
 	}
+}
+
+func imageToText(item epub.Item) string {
+	r, err := item.Open()
+	if err != nil {
+		return ""
+	}
+
+	img, _, err := image.Decode(r)
+	if err != nil {
+		return ""
+	}
+	bounds := img.Bounds()
+
+	// Assume a character height to width ratio of 2:1.
+	w := 80
+	h := (bounds.Max.Y * w) / (bounds.Max.X * 2)
+	img = resize.Resize(uint(w), uint(h), img, resize.Lanczos3)
+
+	charGradient := []rune("MND8OZ$7I?+=~:,..")
+	buf := new(bytes.Buffer)
+
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			c := color.GrayModel.Convert(img.At(x, y))
+			y := c.(color.Gray).Y
+			pos := (len(charGradient) - 1) * int(y) / 255
+			buf.WriteRune(charGradient[pos])
+		}
+		buf.WriteRune('\n')
+	}
+
+	return buf.String()
 }
