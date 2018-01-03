@@ -100,7 +100,7 @@ func (c *cellbuf) appendStyledText(str string, fg, bg termbox.Attribute) {
 			c.setCell(c.col, c.row, r, fg, bg)
 			c.col++
 		}
-		if c.col < c.width {
+		if c.col != c.lmargin {
 			c.col++
 		}
 	}
