@@ -90,7 +90,7 @@ func (a *app) openChapter() error {
 	if err != nil {
 		return err
 	}
-	doc, err := parseText(f)
+	doc, err := parseText(f, a.book.Manifest.Items)
 	if err != nil {
 		return err
 	}
