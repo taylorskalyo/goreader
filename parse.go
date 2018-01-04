@@ -185,6 +185,9 @@ func (p *parser) handleStartTag(token html.Token) {
 		p.doc.appendText("\n")
 	case atom.P:
 		p.doc.col += 2
+	case atom.Hr:
+		p.doc.col = 0
+		p.doc.appendText(strings.Repeat("-", p.doc.width))
 	}
 }
 
