@@ -12,7 +12,8 @@ type pager struct {
 func (p pager) draw() error {
 	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 
-	_, height := termbox.Size()
+	width, height := termbox.Size()
+	var centerOffset int
 	for y := 0; y < height; y++ {
 		for x := 0; x < p.doc.width; x++ {
 			index := (y+p.scrollY)*p.doc.width + x
@@ -20,10 +21,13 @@ func (p pager) draw() error {
 				continue
 			}
 			cell := p.doc.cells[index]
+			if width > p.doc.width {
+				centerOffset = (width - p.doc.width) / 2
+			}
 
 			// Calling SetCell with coordinates outside of the terminal viewport
 			// results in a no-op.
-			termbox.SetCell(x+p.scrollX, y, cell.Ch, cell.Fg, cell.Bg)
+			termbox.SetCell(x+p.scrollX+centerOffset, y, cell.Ch, cell.Fg, cell.Bg)
 		}
 	}
 
