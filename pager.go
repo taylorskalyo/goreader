@@ -59,8 +59,8 @@ func (p *pager) scrollUp() bool {
 // scrollLeft pans the pager's viewport left, without exceeding the underlying
 // cell buffer document's boundaries.
 func (p *pager) scrollLeft() bool {
-	if p.scrollX > -p.maxScrollX() {
-		p.scrollX--
+	if p.scrollX < 0 {
+		p.scrollX++
 		return true
 	}
 
@@ -70,8 +70,8 @@ func (p *pager) scrollLeft() bool {
 // scrollRight pans the pager's viewport right, without exceeding the
 // underlying cell buffer document's boundaries.
 func (p *pager) scrollRight() bool {
-	if p.scrollX < 0 {
-		p.scrollX++
+	if p.scrollX > -p.maxScrollX() {
+		p.scrollX--
 		return true
 	}
 

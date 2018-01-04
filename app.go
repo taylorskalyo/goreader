@@ -34,6 +34,14 @@ func (a *app) run() error {
 			switch ev.Key {
 			case termbox.KeyEsc:
 				return nil
+			case termbox.KeyArrowDown:
+				a.pager.scrollDown()
+			case termbox.KeyArrowUp:
+				a.pager.scrollUp()
+			case termbox.KeyArrowRight:
+				a.pager.scrollRight()
+			case termbox.KeyArrowLeft:
+				a.pager.scrollLeft()
 			default:
 				switch ev.Ch {
 				case 'q':

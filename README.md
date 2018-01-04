@@ -21,14 +21,16 @@ goreader [epub_file]
 
 ### Keybindings
 
-| Key | Action            |
-| --- | ----------------- |
-| `q` | Quit              |
-| `j` | Scroll up         |
-| `k` | Scroll down       |
-| `h` | Scroll left       |
-| `l` | Scroll right      |
-| `H` | Previous chapter  |
-| `L` | Next chapter      |
-| `g` | Top of chapter    |
-| `G` | Bottom of chapter |
+| Key               | Action            |
+| ----------------- | ----------------- |
+| `q`               | Quit              |
+| `j` / Up arrow    | Scroll up         |
+| `k` / Down arrow  | Scroll down       |
+| `h` / Left arrow  | Scroll left       |
+| `l` / Right arrow | Scroll right      |
+| `b`               | Previous page     |
+| `f`               | Next page         |
+| `H`               | Previous chapter  |
+| `L`               | Next chapter      |
+| `g`               | Top of chapter    |
+| `G`               | Bottom of chapter |
