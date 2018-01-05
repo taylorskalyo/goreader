@@ -22,7 +22,7 @@ import (
 )
 
 type parser struct {
-	elStack   []atom.Atom
+	tagStack  []atom.Atom
 	tokenizer *html.Tokenizer
 	doc       cellbuf
 	items     []epub.Item
@@ -34,6 +34,7 @@ type cellbuf struct {
 	lmargin int
 	col     int
 	row     int
+	fg, bg  termbox.Attribute
 }
 
 // setCell changes a cell's attributes in the cell buffer document at the given
@@ -79,8 +80,31 @@ func scanWords(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	return start, nil, nil
 }
 
-// appendStyledText appends styled text to the cell buffer document.
-func (c *cellbuf) appendStyledText(str string, fg, bg termbox.Attribute) {
+// style sets the foreground/background attributes for future cells in the cell
+// buffer document based on HTML tags in the tag stack.
+func (c *cellbuf) style(tags []atom.Atom) {
+	fg := termbox.ColorDefault
+	for _, tag := range tags {
+		switch tag {
+		case atom.B, atom.Strong, atom.Em:
+			fg |= termbox.AttrBold
+		case atom.I:
+			fg |= termbox.ColorYellow
+		case atom.Title:
+			fg |= termbox.ColorRed
+		case atom.H1:
+			fg |= termbox.ColorMagenta
+		case atom.H2:
+			fg |= termbox.ColorBlue
+		case atom.H3, atom.H4, atom.H5, atom.H6:
+			fg |= termbox.ColorCyan
+		}
+	}
+	c.fg = fg
+}
+
+// appendText appends text to the cell buffer document.
+func (c *cellbuf) appendText(str string) {
 	if c.col < c.lmargin {
 		c.col = c.lmargin
 	}
@@ -98,18 +122,13 @@ func (c *cellbuf) appendStyledText(str string, fg, bg termbox.Attribute) {
 				c.col = c.lmargin
 				continue
 			}
-			c.setCell(c.col, c.row, r, fg, bg)
+			c.setCell(c.col, c.row, r, c.fg, c.bg)
 			c.col++
 		}
 		if c.col != c.lmargin {
 			c.col++
 		}
 	}
-}
-
-// appendText appends unstyled text to the cell buffer document.
-func (c *cellbuf) appendText(str string) {
-	c.appendStyledText(str, termbox.ColorDefault, termbox.ColorDefault)
 }
 
 // parseText takes in html content via an io.Reader and returns a buffer
@@ -134,14 +153,14 @@ func (p *parser) parse(io.Reader) (err error) {
 		case html.ErrorToken:
 			err = p.tokenizer.Err()
 		case html.StartTagToken:
-			p.elStack = append(p.elStack, token.DataAtom) // push element
+			p.tagStack = append(p.tagStack, token.DataAtom) // push element
 			fallthrough
 		case html.SelfClosingTagToken:
 			p.handleStartTag(token)
 		case html.TextToken:
 			p.handleText(token)
 		case html.EndTagToken:
-			p.elStack = p.elStack[:len(p.elStack)-1] // pop element
+			p.tagStack = p.tagStack[:len(p.tagStack)-1] // pop element
 		}
 		if err == io.EOF {
 			return nil
@@ -155,9 +174,10 @@ func (p *parser) parse(io.Reader) (err error) {
 // that should not be displayed as text (e.g. style blocks).
 func (p *parser) handleText(token html.Token) {
 	// Skip style tags
-	if len(p.elStack) > 0 && p.elStack[len(p.elStack)-1] == atom.Style {
+	if len(p.tagStack) > 0 && p.tagStack[len(p.tagStack)-1] == atom.Style {
 		return
 	}
+	p.doc.style(p.tagStack)
 	p.doc.appendText(string(token.Data))
 }
 
