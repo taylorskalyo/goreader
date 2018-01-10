@@ -1,5 +1,9 @@
 package htmldoc
 
+import (
+	"strings"
+)
+
 // container is a struct used to buffer unrendered text.
 type container interface {
 	add(stringer) error
@@ -39,7 +43,7 @@ type textBlock struct {
 
 // add appends text to a textBlock's content.
 func (block *textBlock) add(s stringer) error {
-	block.content += s.toString()
+	block.content = block.content + s.toString()
 	return nil
 }
 
@@ -49,9 +53,9 @@ func (block textBlock) hasContent() bool {
 }
 
 // toString renders a textBlock's content as a word-wrapped string.
-func (block textBlock) toString() string {
-	//return wrap(block.content, block.width)
-	return block.content
+func (block textBlock) toString() (s string) {
+	s = strings.TrimSpace(wrap(block.content, block.w))
+	return
 }
 
 // width returns the width of a textBlock.

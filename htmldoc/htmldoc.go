@@ -1,10 +1,13 @@
 package htmldoc
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
@@ -41,7 +44,7 @@ func (doc Document) add(s stringer) error {
 		return nil
 	}
 
-	_, err := io.WriteString(doc.Writer, s.toString())
+	_, err := io.WriteString(doc.Writer, strings.TrimSpace((s.toString())))
 	return err
 }
 
@@ -95,11 +98,80 @@ func (doc Document) Render() (err error) {
 // characters with a single space.
 func stripFormatting(s string) string {
 	re := regexp.MustCompile(`\s+`)
-	return strings.TrimSpace(re.ReplaceAllString(s, " "))
+	return re.ReplaceAllString(s, " ")
+}
+
+// scanWords is a split function for a Scanner that returns space-separated
+// words. Unlike bufio.ScanWords(), scanWords only splits on spaces (i.e. not
+// newlines, tabs, or other whitespace).
+func scanWords(data []byte, atEOF bool) (advance int, token []byte, err error) {
+	// Skip leading spaces.
+	start := 0
+	for width := 0; start < len(data); start += width {
+		var r rune
+		r, width = utf8.DecodeRune(data[start:])
+		if r != ' ' {
+			break
+		}
+	}
+
+	// Scan until space, marking end of word.
+	for width, i := 0, start; i < len(data); i += width {
+		var r rune
+		r, width = utf8.DecodeRune(data[i:])
+		if r == ' ' {
+			return i + width, data[start:i], nil
+		}
+	}
+
+	// If we're at EOF, we have a final, non-empty, non-terminated word. Return
+	// it.
+	if atEOF && len(data) > start {
+		return len(data), data[start:], nil
+	}
+
+	// Request more data.
+	return start, nil, nil
+}
+
+// wrap word-wraps string s to width w.
+func wrap(s string, w int) string {
+	var col, row int
+	buf := bytes.NewBuffer([]byte{})
+	scanner := bufio.NewScanner(strings.NewReader(s))
+	scanner.Split(scanWords)
+	for scanner.Scan() {
+		word := []rune(scanner.Text())
+		if w > 0 && len(word) > w-col {
+			row++
+			col = 0
+			buf.WriteRune('\n')
+		}
+		for i, r := range word {
+			if r == '\n' {
+				row++
+				col = 0
+				buf.WriteRune(r)
+				continue
+			}
+			if col != 0 && i == 0 {
+				buf.WriteRune(' ')
+				col++
+			}
+			buf.WriteRune(r)
+			col++
+		}
+	}
+
+	return strings.TrimSpace(buf.String())
 }
 
 // handleText adds text elements to a Document.
 func (doc Document) handleText(token html.Token) error {
+	if len(strings.TrimSpace(token.Data)) <= 0 {
+		return nil
+	}
+
 	return doc.add(str{stripFormatting(token.Data)})
 }
 
@@ -116,14 +188,14 @@ func (doc *Document) handleStartTag(token html.Token) {
 		if c := doc.activeContainer(); c != nil && c.hasContent() {
 			doc.add(str{"\n"})
 		}
-		t := textBlock{w: doc.activeContainerWidth()}
+		t := textBlock{}
 		doc.containerStack = append(doc.containerStack, &t)
 	case atom.P, atom.H1, atom.H2, atom.H3, atom.H4, atom.H5, atom.H6:
 		// Separate blocks with content.
 		if c := doc.activeContainer(); c != nil && c.hasContent() {
 			doc.add(str{"\n\n"})
 		}
-		t := textBlock{w: doc.activeContainerWidth()}
+		t := textBlock{}
 		doc.containerStack = append(doc.containerStack, &t)
 	}
 }
