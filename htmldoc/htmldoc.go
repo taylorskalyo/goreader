@@ -157,16 +157,17 @@ func (doc Document) handleText(token html.Token) error {
 	return doc.add(t)
 }
 
-// handleStartTag adds a new container to a Document's container stack, if
-// necessary.
+// handleStartTag modifies a Document based on a start tag token.
 func (doc *Document) handleStartTag(token html.Token) {
 	switch token.DataAtom {
 	case atom.Style:
 		doc.containerStack = append(doc.containerStack, styleBlock{})
+	case atom.P, atom.H1, atom.H2, atom.H3, atom.H4, atom.H5, atom.H6:
+		doc.add(text{content: "\n"})
 	}
 }
 
-// handleTag adds text representations of non-text elements to a Document.
+// handleTag modifies a Document based on a tag token.
 func (doc Document) handleTag(token html.Token) {
 	switch token.DataAtom {
 	case atom.Img:
@@ -190,12 +191,13 @@ func (doc Document) handleTag(token html.Token) {
 	}
 }
 
-// handleEndTag pops a container from a Document's container stack, if
-// necessary.
+// handleEndTag modifies a Document based on an end tag token.
 func (doc *Document) handleEndTag(token html.Token) {
 	switch token.DataAtom {
 	case atom.Style:
 		doc.popContainer(atom.Style)
+	case atom.P, atom.H1, atom.H2, atom.H3, atom.H4, atom.H5, atom.H6:
+		doc.add(text{content: "\n"})
 	}
 }
 

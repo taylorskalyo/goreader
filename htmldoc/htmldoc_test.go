@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-const expFormat = "Expected: '%v', but got: '%v'\n"
+const expFormat = "Expected:\n'%v'\nBut got:\n'%v'\n"
 
 func TestRender(t *testing.T) {
 	testCases := []struct {
@@ -35,6 +35,23 @@ func TestRender(t *testing.T) {
 			"break",
 			`<html>foo<br>bar</html>`,
 			"foo\nbar",
+		},
+		{
+			"paragraph",
+			`<html><p>foo</p><p>bar</p></html>`,
+			"\nfoo\n\nbar\n",
+		},
+		{
+			"headings",
+			`<html>
+			<h1>One</h1>
+			<h2>Two</h2>
+			<h3>Three</h3>
+			<h4>Four</h4>
+			<h5>Five</h5>
+			<h6>Six</h6>
+			</html>`,
+			"\nOne\n\nTwo\n\nThree\n\nFour\n\nFive\n\nSix\n",
 		},
 	}
 
