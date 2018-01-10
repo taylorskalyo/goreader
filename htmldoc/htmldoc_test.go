@@ -39,7 +39,12 @@ func TestRender(t *testing.T) {
 		{
 			"paragraph",
 			`<html><p>foo</p><p>bar</p></html>`,
-			"\nfoo\n\nbar\n",
+			"foo\n\nbar",
+		},
+		{
+			"nested paragraphs",
+			`<html><p>foo<p>bar</p></p></html>`,
+			"foo\n\nbar",
 		},
 		{
 			"headings",
@@ -51,7 +56,20 @@ func TestRender(t *testing.T) {
 			<h5>Five</h5>
 			<h6>Six</h6>
 			</html>`,
-			"\nOne\n\nTwo\n\nThree\n\nFour\n\nFive\n\nSix\n",
+			"One\n\nTwo\n\nThree\n\nFour\n\nFive\n\nSix",
+		},
+		{
+			"div",
+			`<html>
+			<div>foo</div>
+			<div>
+				bar
+				<div>
+				  baz
+				</div>
+			</div>
+			</html>`,
+			"foo\nbar\nbaz",
 		},
 	}
 

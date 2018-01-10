@@ -10,58 +10,6 @@ import (
 	"golang.org/x/net/html/atom"
 )
 
-// stringer is a struct that can be expressed as a string.
-type stringer interface {
-	toString() string
-}
-
-// container is a struct used to buffer unrendered text.
-type container interface {
-	add(stringer) error
-	toString() string
-	width() int
-}
-
-// styleBlock is a placeholder container that discards any content inside it.
-type styleBlock struct{}
-
-// add discards content.
-func (block styleBlock) add(s stringer) error {
-	return nil
-}
-
-// toString always returns an empty string.
-func (block styleBlock) toString() string {
-	return ""
-}
-
-// width always returns 0.
-func (block styleBlock) width() int {
-	return 0
-}
-
-// text represents word-wrapped string content.
-type text struct {
-	content string
-	width   int
-}
-
-// toString renders a text's content as a word-wrapped string
-func (t text) toString() string {
-	//return wrap(block.content, block.width)
-	return t.content
-}
-
-// hRule represents a horizontal rule.
-type hRule struct {
-	width int
-}
-
-// toString renders an hRule.
-func (hr hRule) toString() string {
-	return strings.Repeat("-", hr.width)
-}
-
 // A Document represents HTML rendered as text suitable for output within a
 // terminal or other text-only environments. Optionally, minimal formatting can
 // be applied using ANSI escape sequenes.
@@ -152,18 +100,31 @@ func stripFormatting(s string) string {
 
 // handleText adds text elements to a Document.
 func (doc Document) handleText(token html.Token) error {
-	content := stripFormatting(token.Data)
-	t := text{content: content, width: doc.activeContainerWidth()}
-	return doc.add(t)
+	return doc.add(str{stripFormatting(token.Data)})
 }
 
 // handleStartTag modifies a Document based on a start tag token.
 func (doc *Document) handleStartTag(token html.Token) {
 	switch token.DataAtom {
 	case atom.Style:
-		doc.containerStack = append(doc.containerStack, styleBlock{})
+		doc.containerStack = append(doc.containerStack, &styleBlock{})
+	case atom.Html, atom.Body, atom.Head:
+		t := textBlock{w: doc.activeContainerWidth()}
+		doc.containerStack = append(doc.containerStack, &t)
+	case atom.Div:
+		// Separate blocks with content.
+		if c := doc.activeContainer(); c != nil && c.hasContent() {
+			doc.add(str{"\n"})
+		}
+		t := textBlock{w: doc.activeContainerWidth()}
+		doc.containerStack = append(doc.containerStack, &t)
 	case atom.P, atom.H1, atom.H2, atom.H3, atom.H4, atom.H5, atom.H6:
-		doc.add(text{content: "\n"})
+		// Separate blocks with content.
+		if c := doc.activeContainer(); c != nil && c.hasContent() {
+			doc.add(str{"\n\n"})
+		}
+		t := textBlock{w: doc.activeContainerWidth()}
+		doc.containerStack = append(doc.containerStack, &t)
 	}
 }
 
@@ -175,13 +136,11 @@ func (doc Document) handleTag(token html.Token) {
 			switch atom.Lookup([]byte(a.Key)) {
 			case atom.Alt:
 				altText := fmt.Sprintf("Alt text: %s\n", a.Val)
-				t := text{content: altText, width: doc.activeContainerWidth()}
-				doc.add(t)
+				doc.add(str{altText})
 			}
 		}
 	case atom.Br:
-		t := text{content: "\n", width: 0}
-		doc.add(t)
+		doc.add(str{"\n"})
 	case atom.Hr:
 		width := doc.activeContainerWidth()
 		if width <= 0 {
@@ -195,9 +154,12 @@ func (doc Document) handleTag(token html.Token) {
 func (doc *Document) handleEndTag(token html.Token) {
 	switch token.DataAtom {
 	case atom.Style:
-		doc.popContainer(atom.Style)
-	case atom.P, atom.H1, atom.H2, atom.H3, atom.H4, atom.H5, atom.H6:
-		doc.add(text{content: "\n"})
+		doc.popContainer(token.DataAtom)
+	case atom.Html, atom.Body, atom.Head, atom.Div, atom.P, atom.H1, atom.H2, atom.H3, atom.H4, atom.H5, atom.H6:
+		t := doc.popContainer(token.DataAtom)
+		if t != nil {
+			doc.add(t)
+		}
 	}
 }
 
@@ -208,8 +170,16 @@ func (doc *Document) popContainer(a atom.Atom) container {
 		return nil
 	}
 	switch v := doc.containerStack[last].(type) {
-	case styleBlock:
+	case *styleBlock:
 		if a != atom.Style {
+			return nil
+		}
+		doc.containerStack = doc.containerStack[:last]
+		return v
+	case *textBlock:
+		switch a {
+		case atom.Html, atom.Body, atom.Head, atom.Div, atom.P, atom.H1, atom.H2, atom.H3, atom.H4, atom.H5, atom.H6:
+		default:
 			return nil
 		}
 		doc.containerStack = doc.containerStack[:last]
