@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -147,8 +148,16 @@ func wrap(s string, w int) string {
 			col = 0
 			buf.WriteRune('\n')
 		}
-		for i, r := range word {
-			if r == '\n' {
+		for i := 0; i < len(word); i++ {
+			r := word[i]
+			switch r {
+			case '\033':
+				n, _ := ANSICodes(string(word[i:]))
+				buf.WriteString(string(word[i : i+n]))
+				word = append(word[:i], word[i+n:]...)
+				i--
+				continue
+			case '\n':
 				row++
 				col = 0
 				buf.WriteRune(r)
@@ -258,4 +267,39 @@ func (doc *Document) popContainer(a atom.Atom) container {
 		return v
 	}
 	return nil
+}
+
+// ANSICodes takes in a string that starts with an escape character, and
+// returns the length of the ANSI sequence and corresponding codes.
+func ANSICodes(s string) (n int, codes []int) {
+	if s[:2] != "\033[" {
+		return 0, []int{}
+	}
+	n += 2
+	var numArr []rune
+	for _, r := range []rune(s)[2:] {
+		switch r {
+		case 'm':
+			i, err := strconv.Atoi(string(numArr))
+			if err != nil {
+				return 0, []int{}
+			}
+			codes = append(codes, i)
+			n++
+			return
+		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+			numArr = append(numArr, r)
+		case ';':
+			i, err := strconv.Atoi(string(numArr))
+			if err != nil {
+				return 0, []int{}
+			}
+			codes = append(codes, i)
+		default:
+			break
+		}
+		n++
+	}
+
+	return 0, []int{}
 }

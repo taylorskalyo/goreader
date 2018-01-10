@@ -96,7 +96,7 @@ func TestRenderWithWidth(t *testing.T) {
 	}{
 		{
 			"horizontal rule",
-			`<html><hr></html>`,
+			"<html><hr></html>",
 			"----------------------------------------",
 		},
 		{
@@ -122,6 +122,11 @@ fugiat nulla pariatur. Excepteur sint
 occaecat cupidatat non proident, sunt in
 culpa qui officia deserunt mollit anim id
 est laborum.`,
+		},
+		{
+			"color",
+			"<html>\033[0;31mred \033[32mgreen \033[34mblue \033[0m</html>",
+			"\033[0;31mred\033[32m green\033[34m blue\033[0m",
 		},
 	}
 
