@@ -147,7 +147,7 @@ func (doc Document) Render() (err error) {
 // characters with a single space.
 func stripFormatting(s string) string {
 	re := regexp.MustCompile(`\s+`)
-	return re.ReplaceAllString(s, " ")
+	return strings.TrimSpace(re.ReplaceAllString(s, " "))
 }
 
 // handleText adds text elements to a Document.
@@ -182,7 +182,11 @@ func (doc Document) handleTag(token html.Token) {
 		t := text{content: "\n", width: 0}
 		doc.add(t)
 	case atom.Hr:
-		doc.add(hRule{width: doc.activeContainerWidth()})
+		width := doc.activeContainerWidth()
+		if width <= 0 {
+			width = 5 // default to 5 if parent width isn't specified
+		}
+		doc.add(hRule{width: width})
 	}
 }
 
