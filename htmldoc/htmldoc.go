@@ -2,304 +2,303 @@ package htmldoc
 
 import (
 	"bufio"
-	"bytes"
-	"fmt"
 	"io"
 	"regexp"
-	"strconv"
 	"strings"
-	"unicode/utf8"
+	"unicode"
 
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
 )
 
-// A Document represents HTML rendered as text suitable for output within a
-// terminal or other text-only environments. Optionally, minimal formatting can
-// be applied using ANSI escape sequenes.
-type Document struct {
-	// RefMap is used to look-up elements with href attributes.
-	RefMap map[string]string
+const (
+	inline Display = iota
+	block
 
-	// Reader is the HTML source.
-	Reader io.Reader
+	atomText atom.Atom = 0
 
-	// Writer is the destination for rendered text.
-	Writer io.Writer
+	maxUint = ^uint(0)
+	maxInt  = int(maxUint >> 1)
+)
 
-	// Width is the maximum width of a Document's rendered text.
-	Width int
+type Display int
 
-	// ANSIEnabled determines whether or not to format rendered text using ANSI
-	// escape sequences.
-	ANSIEnabled bool
+type Node struct {
+	Parent, FirstChild, LastChild, PrevSibling, NextSibling *Node
 
-	// containerStack is used to buffer unrendered text.
-	containerStack []container
+	// X and Y describe the location of the current node in a rendered document.
+	X, Y int
+
+	// HeadOffset and TailOffset describe the position of inline text inside a
+	// a node's bounding box.
+	HeadOffset, TailOffset int
+
+	// RenderWidth and RenderHeight describe the width and height of the node's
+	// bounding box within a rendered document.
+	RenderWidth, RenderHeight int
+
+	contentWidth, minWidth int
+
+	colWidths []int
+
+	html.Node
 }
 
-// add stores renderable content in the active container of a Document.
-func (doc Document) add(s stringer) error {
-	if c := doc.activeContainer(); c != nil {
-		c.add(s)
-		return nil
+func (n Node) Display() Display {
+	switch n.DataAtom {
+	case atomText, atom.A, atom.Abbr, atom.B, atom.Bdo, atom.Big, atom.Br,
+		atom.Button, atom.Cite, atom.Code, atom.Dfn, atom.Em, atom.I, atom.Img,
+		atom.Input, atom.Kbd, atom.Label, atom.Map, atom.Object, atom.Q, atom.Samp,
+		atom.Script, atom.Select, atom.Small, atom.Span, atom.Strong, atom.Sub,
+		atom.Sup, atom.Textarea, atom.Time, atom.Tt, atom.Var:
+		return inline
 	}
 
-	_, err := io.WriteString(doc.Writer, strings.TrimSpace((s.toString())))
-	return err
+	return block
 }
 
-// activeContainer returns the top container on a Document's container stack.
-func (doc Document) activeContainer() container {
-	if last := len(doc.containerStack) - 1; last >= 0 {
-		return doc.containerStack[last]
-	}
-
-	return nil
-}
-
-func (doc Document) activeContainerWidth() int {
-	if c := doc.activeContainer(); c != nil {
-		return c.width()
-	}
-
-	return doc.Width
-}
-
-// Render writes rendered text to a Document's Writer.
-func (doc Document) Render() (err error) {
-	tokenizer := html.NewTokenizer(doc.Reader)
-	for {
-		tokenType := tokenizer.Next()
-		token := tokenizer.Token()
-		switch tokenType {
-		case html.ErrorToken:
-			err = tokenizer.Err()
-			if err == io.EOF {
-				return nil
-			} else if err != nil {
-				return err
+func (n Node) setMinWidth() {
+	switch n.DataAtom {
+	case atomText:
+		// For text elements, use the length of the longest word.
+		scanner := bufio.NewScanner(strings.NewReader(n.Data))
+		scanner.Split(bufio.ScanWords)
+		for scanner.Scan() {
+			if width := len(scanner.Text()); width > n.minWidth {
+				n.minWidth = width
 			}
-		case html.StartTagToken:
-			doc.handleStartTag(token)
-			fallthrough
-		case html.SelfClosingTagToken:
-			doc.handleTag(token)
-		case html.TextToken:
-			if err = doc.handleText(token); err != nil {
-				return err
+		}
+	case atom.Img:
+		// For images, use the length of the alt text or a fixed minWidth.
+		max := 5
+		for _, a := range n.Attr {
+			if atom.Lookup([]byte(a.Key)) == atom.Alt {
+				if width := len(a.Val); width > max {
+					max = width
+				}
 			}
-		case html.EndTagToken:
-			doc.handleEndTag(token)
+		}
+		n.minWidth = max
+	case atom.Hr:
+		// For hr elements, use a fixed minWidth.
+		n.minWidth = 5
+	case atom.Tr:
+		// For table rows, use the sum of each cell minWidth.
+		for c := n.FirstChild; c != nil; c = n.NextSibling {
+			n.minWidth += c.minWidth
+		}
+	default:
+		// For everything else, use the max minWidth of all child elements.
+		for c := n.FirstChild; c != nil; c = n.NextSibling {
+			if c.minWidth > n.minWidth {
+				n.minWidth = c.minWidth
+			}
 		}
 	}
 }
 
-// stripFormatting replaces each occurrence of one or more whitespace
-// characters with a single space.
-func stripFormatting(s string) string {
-	re := regexp.MustCompile(`\s+`)
-	return re.ReplaceAllString(s, " ")
-}
-
-// scanWords is a split function for a Scanner that returns space-separated
-// words. Unlike bufio.ScanWords(), scanWords only splits on spaces (i.e. not
-// newlines, tabs, or other whitespace).
-func scanWords(data []byte, atEOF bool) (advance int, token []byte, err error) {
-	// Skip leading spaces.
-	start := 0
-	for width := 0; start < len(data); start += width {
-		var r rune
-		r, width = utf8.DecodeRune(data[start:])
-		if r != ' ' {
-			break
-		}
+func (n Node) calcColWidths(tWidth int) (widths []int) {
+	if n.DataAtom != atom.Table {
+		return widths
 	}
 
-	// Scan until space, marking end of word.
-	for width, i := 0, start; i < len(data); i += width {
-		var r rune
-		r, width = utf8.DecodeRune(data[i:])
-		if r == ' ' {
-			return i + width, data[start:i], nil
-		}
-	}
-
-	// If we're at EOF, we have a final, non-empty, non-terminated word. Return
-	// it.
-	if atEOF && len(data) > start {
-		return len(data), data[start:], nil
-	}
-
-	// Request more data.
-	return start, nil, nil
-}
-
-// wrap word-wraps string s to width w.
-func wrap(s string, w int) string {
+	// Initialize widths with each column's minWidth. Sum column content widths
+	// in cWidths.
+	var cWidths []int
 	var col, row int
-	buf := bytes.NewBuffer([]byte{})
-	scanner := bufio.NewScanner(strings.NewReader(s))
-	scanner.Split(scanWords)
-	for scanner.Scan() {
-		word := []rune(scanner.Text())
-		if w > 0 && len(word) > w-col {
-			row++
-			col = 0
-			buf.WriteRune('\n')
-		}
-		for i := 0; i < len(word); i++ {
-			r := word[i]
-			switch r {
-			case '\033':
-				n, _ := ANSICodes(string(word[i:]))
-				buf.WriteString(string(word[i : i+n]))
-				word = append(word[:i], word[i+n:]...)
-				i--
-				continue
-			case '\n':
-				row++
-				col = 0
-				buf.WriteRune(r)
-				continue
+	for r := n.FirstChild; r != nil; r = r.NextSibling {
+		col = 0
+		for c := r.FirstChild; c != nil; c = c.NextSibling {
+			if len(widths) <= col {
+				widths = append(widths, 0)
 			}
-			if col != 0 && i == 0 {
-				buf.WriteRune(' ')
-				col++
+			if len(cWidths) <= col {
+				cWidths = append(cWidths, 0)
 			}
-			buf.WriteRune(r)
+			if c.minWidth > widths[col] {
+				widths[col] = c.minWidth
+			}
+			cWidths[col] += c.contentWidth
 			col++
 		}
+		row++
 	}
 
-	return strings.TrimSpace(buf.String())
-}
+	// Adjust tWidth to account for borders.
+	tWidth -= col + 1
 
-// handleText adds text elements to a Document.
-func (doc Document) handleText(token html.Token) error {
-	if len(strings.TrimSpace(token.Data)) <= 0 {
-		return nil
-	}
-
-	return doc.add(str{stripFormatting(token.Data)})
-}
-
-// handleStartTag modifies a Document based on a start tag token.
-func (doc *Document) handleStartTag(token html.Token) {
-	switch token.DataAtom {
-	case atom.Style:
-		doc.containerStack = append(doc.containerStack, &styleBlock{})
-	case atom.Html, atom.Body, atom.Head:
-		t := textBlock{w: doc.activeContainerWidth()}
-		doc.containerStack = append(doc.containerStack, &t)
-	case atom.Div:
-		// Separate blocks with content.
-		if c := doc.activeContainer(); c != nil && c.hasContent() {
-			doc.add(str{"\n"})
+	// Calculate average content width for each column. Do not exceed tWidth.
+	for col = 0; col < len(cWidths); col++ {
+		cWidths[col] /= row
+		if cWidths[col] > tWidth {
+			cWidths[col] = tWidth
 		}
-		t := textBlock{}
-		doc.containerStack = append(doc.containerStack, &t)
-	case atom.P, atom.H1, atom.H2, atom.H3, atom.H4, atom.H5, atom.H6:
-		// Separate blocks with content.
-		if c := doc.activeContainer(); c != nil && c.hasContent() {
-			doc.add(str{"\n\n"})
-		}
-		t := textBlock{}
-		doc.containerStack = append(doc.containerStack, &t)
 	}
-}
 
-// handleTag modifies a Document based on a tag token.
-func (doc Document) handleTag(token html.Token) {
-	switch token.DataAtom {
-	case atom.Img:
-		for _, a := range token.Attr {
-			switch atom.Lookup([]byte(a.Key)) {
-			case atom.Alt:
-				altText := fmt.Sprintf("Alt text: %s\n", a.Val)
-				doc.add(str{altText})
+	// Shrink columns until they fit tWidth.
+	sum := 0
+	for _, w := range widths {
+		sum += w
+	}
+	for sum > tWidth {
+		// Shrink from right to left.
+
+		for col = len(widths) - 1; widths[col] <= 0 && col > 0; col++ {
+		}
+		widths[col]--
+		sum--
+	}
+
+	// Grow columns until they fit tWidth.
+	sum = 0
+	for _, w := range widths {
+		sum += w
+	}
+	for sum < tWidth {
+		// Pick the column with the highest cWidth to width ratio to grow.
+		for i := range widths {
+			if cWidths[i]/(widths[i]+1) > cWidths[col]/(widths[col]+1) {
+				col = i
 			}
 		}
-	case atom.Br:
-		doc.add(str{"\n"})
-	case atom.Hr:
-		width := doc.activeContainerWidth()
-		if width <= 0 {
-			width = 5 // default to 5 if parent width isn't specified
-		}
-		doc.add(hRule{width: width})
+		widths[col]++
+		sum++
 	}
+
+	return widths
 }
 
-// handleEndTag modifies a Document based on an end tag token.
-func (doc *Document) handleEndTag(token html.Token) {
-	switch token.DataAtom {
-	case atom.Style:
-		doc.popContainer(token.DataAtom)
-	case atom.Html, atom.Body, atom.Head, atom.Div, atom.P, atom.H1, atom.H2, atom.H3, atom.H4, atom.H5, atom.H6:
-		t := doc.popContainer(token.DataAtom)
-		if t != nil {
-			doc.add(t)
+func (n Node) setContentWidth() {
+	switch n.DataAtom {
+	case atomText:
+		// For text elements, use the length of the element's data.
+		n.contentWidth = len(n.Data)
+	case atom.Img, atom.Hr, atom.Table:
+		// For image and hr elements, take up all available space.
+		n.contentWidth = maxInt
+	case atom.Tr:
+		// For table rows, use the sum of each cell contentWidth.
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			n.contentWidth += c.contentWidth
 		}
-	}
-}
-
-// popContainer removes the top container from a Document's container stack.
-func (doc *Document) popContainer(a atom.Atom) container {
-	last := len(doc.containerStack) - 1
-	if last < 0 {
-		return nil
-	}
-	switch v := doc.containerStack[last].(type) {
-	case *styleBlock:
-		if a != atom.Style {
-			return nil
-		}
-		doc.containerStack = doc.containerStack[:last]
-		return v
-	case *textBlock:
-		switch a {
-		case atom.Html, atom.Body, atom.Head, atom.Div, atom.P, atom.H1, atom.H2, atom.H3, atom.H4, atom.H5, atom.H6:
-		default:
-			return nil
-		}
-		doc.containerStack = doc.containerStack[:last]
-		return v
-	}
-	return nil
-}
-
-// ANSICodes takes in a string that starts with an escape character, and
-// returns the length of the ANSI sequence and corresponding codes.
-func ANSICodes(s string) (n int, codes []int) {
-	if s[:2] != "\033[" {
-		return 0, []int{}
-	}
-	n += 2
-	var numArr []rune
-	for _, r := range []rune(s)[2:] {
-		switch r {
-		case 'm':
-			i, err := strconv.Atoi(string(numArr))
-			if err != nil {
-				return 0, []int{}
+	default:
+		// For everything else, use the max contentWidth of all child elements.
+		// Group inline elements together when possible.
+		inlineWidth := 0
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			switch c.Display() {
+			case inline:
+				inlineWidth += c.contentWidth
+				if inlineWidth > n.contentWidth {
+					n.contentWidth = inlineWidth
+				}
+			default:
+				inlineWidth = 0
+				if c.contentWidth > n.contentWidth {
+					n.contentWidth = c.contentWidth
+				}
 			}
-			codes = append(codes, i)
-			n++
-			return
-		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
-			numArr = append(numArr, r)
-		case ';':
-			i, err := strconv.Atoi(string(numArr))
-			if err != nil {
-				return 0, []int{}
+		}
+	}
+}
+
+// trimSpace removes extra formatting spaces in pretty printed HTML.
+func trimSpace(prev, cur *Node) *Node {
+	if cur.Display() == block && prev != nil {
+		// If we encounter a block element, trim spaces from the right of the last
+		// text element.
+		prev.Data = strings.TrimRightFunc(prev.Data, unicode.IsSpace)
+		prev = nil
+	} else if cur.Type == html.TextNode && len(cur.Data) > 0 {
+		// If we encounter a text element, ensure at most one single space exists
+		// between this text and the previous text.
+		var appendSpace bool
+		if prev != nil {
+			tnData := []rune(prev.Data)
+			appendSpace = unicode.IsSpace(tnData[len(tnData)-1])
+			prev.Data = strings.TrimRightFunc(prev.Data, unicode.IsSpace)
+			if appendSpace {
+				prev.Data += " "
 			}
-			codes = append(codes, i)
-		default:
+		} else {
+			appendSpace = true
+		}
+		prependSpace := !appendSpace && unicode.IsSpace([]rune(cur.Data)[0])
+		cur.Data = strings.TrimLeftFunc(cur.Data, unicode.IsSpace)
+		if len(cur.Data) > 0 {
+			if prependSpace {
+				cur.Data = " " + cur.Data
+			}
+			prev = cur
+		}
+	}
+
+	// Remove newlines; replace multiple spaces with a single space.
+	re := regexp.MustCompile(`\s+`)
+	cur.Data = re.ReplaceAllString(cur.Data, " ")
+
+	return prev
+}
+
+func Parse(r io.Reader) (*Node, error) {
+	hn, err := html.Parse(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var inlineText *Node
+
+	// Recursively convert *html.Node into *Node.
+	c := &Node{
+		Node:   *hn,
+		Parent: nil,
+	}
+	for {
+		if c.FirstChild == nil && c.Node.FirstChild != nil {
+			// Create and visit child node.
+			c.FirstChild = &Node{Node: *c.Node.FirstChild, Parent: c}
+			c = c.FirstChild
+			inlineText = trimSpace(inlineText, c)
+		} else if c.NextSibling == nil && c.Node.NextSibling != nil {
+			// Create and visit sibling node.
+			c.NextSibling = &Node{Node: *c.Node.NextSibling, Parent: c}
+			c.NextSibling.PrevSibling = c
+			c = c.NextSibling
+			inlineText = trimSpace(inlineText, c)
+		} else if c.Parent != nil {
+			// Return to parent.
+			c.Parent.LastChild = c
+			c = c.Parent
+			c.setMinWidth()
+			c.setContentWidth()
+		} else {
+			// All nodes have been visited.
 			break
 		}
-		n++
 	}
 
-	return 0, []int{}
+	return c, nil
+}
+
+func (n *Node) Render(w int) {
+	// Traverse tree
+	// - Set width/height and x/y fields
+	c := n
+	c.RenderHeight = -1
+	for {
+		if c == n && c.RenderHeight != -1 {
+			break
+		}
+	}
+}
+
+func (n Node) String() string {
+	// Not necessary, but could be useful to other users and for testing
+
+	// Create cell array
+	// Traverse tree, filling cell array
+	// Iterate over cell array, writing each cell's rune to string buffer
+	// Store current attribute/ANSI sequence in a var
+	// When attribute/ANSI sequence changes, write the new value to the string buffer
+	return ""
 }
