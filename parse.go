@@ -118,8 +118,6 @@ func (c *cellbuf) appendText(str string) {
 		}
 		for _, r := range word {
 			if r == '\n' {
-				c.row++
-				c.col = c.lmargin
 				continue
 			}
 			c.setCell(c.col, c.row, r, c.fg, c.bg)
@@ -178,7 +176,7 @@ func (p *parser) handleText(token html.Token) {
 		return
 	}
 	p.doc.style(p.tagStack)
-	p.doc.appendText(string(token.Data))
+	p.doc.appendText(strings.TrimSpace(string(token.Data)))
 }
 
 // handleStartTag appends text representations of non-text elements (e.g. image alt
@@ -190,36 +188,51 @@ func (p *parser) handleStartTag(token html.Token) {
 		for _, a := range token.Attr {
 			switch atom.Lookup([]byte(a.Key)) {
 			case atom.Alt:
-				text := fmt.Sprintf("Alt text: %s\n", a.Val)
+				text := fmt.Sprintf("Alt text: %s", a.Val)
 				p.doc.appendText(text)
+				p.doc.row++
+				p.doc.col = p.doc.lmargin
 			case atom.Src:
 				for _, item := range p.items {
 					if item.HREF == a.Val {
-						p.doc.appendText(imageToText(item))
+						for _, line := range imageToText(item) {
+							p.doc.appendText(line)
+							p.doc.col = p.doc.lmargin
+							p.doc.row++
+						}
 						break
 					}
 				}
 			}
 		}
 	case atom.Br:
-		p.doc.appendText("\n")
+		p.doc.row++
+		p.doc.col = p.doc.lmargin
+	case atom.H1, atom.H2, atom.H3, atom.H4, atom.H5, atom.H6, atom.Title,
+		atom.Div, atom.Tr:
+		p.doc.row += 2
+		p.doc.col = p.doc.lmargin
 	case atom.P:
+		p.doc.row += 2
+		p.doc.col = p.doc.lmargin
 		p.doc.col += 2
 	case atom.Hr:
+		p.doc.row++
 		p.doc.col = 0
 		p.doc.appendText(strings.Repeat("-", p.doc.width))
 	}
 }
 
-func imageToText(item epub.Item) string {
+func imageToText(item epub.Item) []string {
+	lines := []string{}
 	r, err := item.Open()
 	if err != nil {
-		return ""
+		return lines
 	}
 
 	img, _, err := image.Decode(r)
 	if err != nil {
-		return ""
+		return lines
 	}
 	bounds := img.Bounds()
 
@@ -238,8 +251,9 @@ func imageToText(item epub.Item) string {
 			pos := (len(charGradient) - 1) * int(y) / 255
 			buf.WriteRune(charGradient[pos])
 		}
-		buf.WriteRune('\n')
+		lines = append(lines, buf.String())
+		buf = new(bytes.Buffer)
 	}
 
-	return buf.String()
+	return lines
 }
