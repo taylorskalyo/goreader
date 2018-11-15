@@ -8,7 +8,7 @@ import (
 	"image/color"
 	"io"
 	"strings"
-	"unicode/utf8"
+	"unicode"
 
 	_ "image/jpeg"
 	_ "image/png"
@@ -34,6 +34,7 @@ type cellbuf struct {
 	lmargin int
 	col     int
 	row     int
+	space   bool
 	fg, bg  termbox.Attribute
 }
 
@@ -45,39 +46,6 @@ func (c *cellbuf) setCell(x, y int, ch rune, fg, bg termbox.Attribute) {
 		c.cells = append(c.cells, make([]termbox.Cell, 1024)...)
 	}
 	c.cells[y*c.width+x] = termbox.Cell{Ch: ch, Fg: fg, Bg: bg}
-}
-
-// scanWords is a split function for a Scanner that returns space-separated
-// words. Unlike bufio.ScanWords(), scanWords only splits on spaces (i.e. not
-// newlines, tabs, or other whitespace).
-func scanWords(data []byte, atEOF bool) (advance int, token []byte, err error) {
-	// Skip leading spaces.
-	start := 0
-	for width := 0; start < len(data); start += width {
-		var r rune
-		r, width = utf8.DecodeRune(data[start:])
-		if r != ' ' {
-			break
-		}
-	}
-
-	// Scan until space, marking end of word.
-	for width, i := 0, start; i < len(data); i += width {
-		var r rune
-		r, width = utf8.DecodeRune(data[i:])
-		if r == ' ' {
-			return i + width, data[start:i], nil
-		}
-	}
-
-	// If we're at EOF, we have a final, non-empty, non-terminated word. Return
-	// it.
-	if atEOF && len(data) > start {
-		return len(data), data[start:], nil
-	}
-
-	// Request more data.
-	return start, nil, nil
 }
 
 // style sets the foreground/background attributes for future cells in the cell
@@ -105,27 +73,35 @@ func (c *cellbuf) style(tags []atom.Atom) {
 
 // appendText appends text to the cell buffer document.
 func (c *cellbuf) appendText(str string) {
+	if len(str) <= 0 {
+		return
+	}
 	if c.col < c.lmargin {
 		c.col = c.lmargin
 	}
-	scanner := bufio.NewScanner(strings.NewReader(str))
-	scanner.Split(scanWords)
+	runes := []rune(str)
+	if unicode.IsSpace(runes[0]) {
+		c.space = true
+	}
+	scanner := bufio.NewScanner(strings.NewReader(strings.TrimSpace(str)))
+	scanner.Split(bufio.ScanWords)
 	for scanner.Scan() {
+		if c.col != c.lmargin && c.space {
+			c.col++
+		}
 		word := []rune(scanner.Text())
 		if len(word) > c.width-c.col {
 			c.row++
 			c.col = c.lmargin
 		}
 		for _, r := range word {
-			if r == '\n' {
-				continue
-			}
 			c.setCell(c.col, c.row, r, c.fg, c.bg)
 			c.col++
 		}
-		if c.col != c.lmargin {
-			c.col++
-		}
+		c.space = true
+	}
+	if !unicode.IsSpace(runes[len(runes)-1]) {
+		c.space = false
 	}
 }
 
@@ -176,7 +152,7 @@ func (p *parser) handleText(token html.Token) {
 		return
 	}
 	p.doc.style(p.tagStack)
-	p.doc.appendText(strings.TrimSpace(string(token.Data)))
+	p.doc.appendText(string(token.Data))
 }
 
 // handleStartTag appends text representations of non-text elements (e.g. image alt
