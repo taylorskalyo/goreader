@@ -10,7 +10,12 @@ import (
 
 func main() {
 	if len(os.Args) <= 1 {
-		fmt.Fprintln(os.Stderr, "You must specify a file")
+		printUsage()
+		os.Exit(1)
+	}
+
+	if os.Args[1] == "-h" || os.Args[1] == "--help" {
+		printHelp()
 		os.Exit(1)
 	}
 
@@ -33,4 +38,26 @@ func main() {
 	if err := a.run(); err != nil {
 		os.Exit(1)
 	}
+}
+
+func printUsage() {
+	fmt.Fprintln(os.Stderr, "goreader [epub_file]")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "-h		print keybindings")
+}
+
+func printHelp() {
+	fmt.Fprintln(os.Stderr, "Key                  Action")
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, "q                    Quit")
+	fmt.Fprintln(os.Stderr, "j / Up arrow         Scroll up")
+	fmt.Fprintln(os.Stderr, "k / Down arrow       Scroll down")
+	fmt.Fprintln(os.Stderr, "h / Left arrow       Scroll left")
+	fmt.Fprintln(os.Stderr, "l / Right arrow      Scroll right")
+	fmt.Fprintln(os.Stderr, "b                    Previous page")
+	fmt.Fprintln(os.Stderr, "f                    Next page")
+	fmt.Fprintln(os.Stderr, "H                    Previous chapter")
+	fmt.Fprintln(os.Stderr, "L                    Next chapter")
+	fmt.Fprintln(os.Stderr, "g                    Top of chapter")
+	fmt.Fprintln(os.Stderr, "G                    Bottom of chapter")
 }
