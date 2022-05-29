@@ -15,6 +15,7 @@ import (
 
 	"github.com/nfnt/resize"
 	termbox "github.com/nsf/termbox-go"
+	"github.com/olekukonko/tablewriter"
 	"github.com/taylorskalyo/goreader/epub"
 
 	"golang.org/x/net/html"
@@ -22,10 +23,11 @@ import (
 )
 
 type parser struct {
-	tagStack  []atom.Atom
-	tokenizer *html.Tokenizer
-	doc       cellbuf
-	items     []epub.Item
+	tagStack   []atom.Atom
+	tableStack [][][]string
+	tokenizer  *html.Tokenizer
+	doc        cellbuf
+	items      []epub.Item
 }
 
 type cellbuf struct {
@@ -71,7 +73,8 @@ func (c *cellbuf) style(tags []atom.Atom) {
 	c.fg = fg
 }
 
-// appendText appends text to the cell buffer document.
+// appendText appends text to the cell buffer document. Long lines are
+// word-wrapped.
 func (c *cellbuf) appendText(str string) {
 	if len(str) <= 0 {
 		return
@@ -105,6 +108,51 @@ func (c *cellbuf) appendText(str string) {
 	}
 }
 
+// appendText appends text to the curently focussed text element.
+func (p *parser) appendText(str string, raw bool) {
+	if cell := p.getTableCell(); cell != nil {
+		*cell += strings.TrimSpace(str)
+		return
+	}
+	if raw {
+		p.doc.appendRaw(str)
+		return
+	}
+	p.doc.appendText(str)
+}
+
+// getTableCell returns a pointer to the currently focussed table cell, if one
+// exists in the table stack.
+func (p parser) getTableCell() *string {
+	if len(p.tableStack) > 0 {
+		tableI := len(p.tableStack) - 1
+		if len(p.tableStack[tableI]) > 0 {
+			rowI := len(p.tableStack[tableI]) - 1
+			if len(p.tableStack[tableI][rowI]) > 0 {
+				colI := len(p.tableStack[tableI][rowI]) - 1
+				return &p.tableStack[tableI][rowI][colI]
+			}
+		}
+	}
+	return nil
+}
+
+// appendRaw appends a raw string to the cell buffer document.
+func (c *cellbuf) appendRaw(str string) {
+	if c.col < c.lmargin {
+		c.col = c.lmargin
+	}
+	for _, r := range str {
+		if r == '\n' {
+			c.row++
+			c.col = c.lmargin
+			continue
+		}
+		c.setCell(c.col, c.row, r, c.fg, c.bg)
+		c.col++
+	}
+}
+
 // parseText takes in html content via an io.Reader and returns a buffer
 // containing only plain text.
 func parseText(r io.Reader, items []epub.Item) (cellbuf, error) {
@@ -134,6 +182,7 @@ func (p *parser) parse(io.Reader) (err error) {
 		case html.TextToken:
 			p.handleText(token)
 		case html.EndTagToken:
+			p.handleEndTag(token)
 			p.tagStack = p.tagStack[:len(p.tagStack)-1] // pop element
 		}
 		if err == io.EOF {
@@ -152,11 +201,12 @@ func (p *parser) handleText(token html.Token) {
 		return
 	}
 	p.doc.style(p.tagStack)
-	p.doc.appendText(string(token.Data))
+	p.appendText(string(token.Data), false)
 }
 
-// handleStartTag appends text representations of non-text elements (e.g. image alt
-// tags) to the parser buffer.
+// handleStartTag appends text representations of non-text elements (e.g. ASCII
+// art and alt text for images). It also builds complex structures, like
+// tables, by placing the fragmentary pieces on a stack.
 func (p *parser) handleStartTag(token html.Token) {
 	switch token.DataAtom {
 	case atom.Img:
@@ -169,6 +219,13 @@ func (p *parser) handleStartTag(token html.Token) {
 				p.doc.row++
 				p.doc.col = p.doc.lmargin
 			case atom.Src:
+				// In order to display images inside tables, we need to know the column
+				// width, which isn't known (if it's available through the tablewriter
+				// API at all) until the whole table has been traversed. For now, just
+				// skip rendering images inside tables.
+				if cell := p.getTableCell(); cell != nil {
+					break
+				}
 				for _, item := range p.items {
 					if item.HREF == a.Val {
 						for _, line := range imageToText(item) {
@@ -185,7 +242,7 @@ func (p *parser) handleStartTag(token html.Token) {
 		p.doc.row++
 		p.doc.col = p.doc.lmargin
 	case atom.H1, atom.H2, atom.H3, atom.H4, atom.H5, atom.H6, atom.Title,
-		atom.Div, atom.Tr:
+		atom.Div:
 		p.doc.row += 2
 		p.doc.col = p.doc.lmargin
 	case atom.P:
@@ -195,7 +252,34 @@ func (p *parser) handleStartTag(token html.Token) {
 	case atom.Hr:
 		p.doc.row++
 		p.doc.col = 0
-		p.doc.appendText(strings.Repeat("-", p.doc.width))
+		p.appendText(strings.Repeat("-", p.doc.width), true)
+	case atom.Table:
+		p.tableStack = append(p.tableStack, [][]string{})
+	case atom.Tr:
+		tableI := len(p.tableStack) - 1
+		p.tableStack[tableI] = append(p.tableStack[tableI], []string{})
+	case atom.Td:
+		tableI := len(p.tableStack) - 1
+		rowI := len(p.tableStack[tableI]) - 1
+		p.tableStack[tableI][rowI] = append(p.tableStack[tableI][rowI], "")
+	}
+}
+
+// handleEndTag appends text representations of complex structures, like
+// tables, by piecing together fragments from a stack.
+func (p *parser) handleEndTag(token html.Token) {
+	switch token.DataAtom {
+	case atom.Table:
+		tableI := len(p.tableStack) - 1
+		buf := bytes.NewBufferString("")
+		table := tablewriter.NewWriter(buf)
+		table.AppendBulk(p.tableStack[tableI])
+		table.SetBorder(true)
+		table.SetRowLine(true)
+		table.Render()
+		p.tableStack = p.tableStack[:tableI]
+		p.appendText("\n", true)
+		p.appendText(buf.String(), true)
 	}
 }
 
