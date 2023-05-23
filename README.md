@@ -24,8 +24,8 @@ goreader [epub_file]
 | Key               | Action            |
 | ----------------- | ----------------- |
 | `q`               | Quit              |
-| `j` / Up arrow    | Scroll up         |
-| `k` / Down arrow  | Scroll down       |
+| `k` / Up arrow    | Scroll up         |
+| `j` / Down arrow  | Scroll down       |
 | `h` / Left arrow  | Scroll left       |
 | `l` / Right arrow | Scroll right      |
 | `b`               | Previous page     |
