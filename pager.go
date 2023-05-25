@@ -36,46 +36,34 @@ func (p pager) draw() error {
 
 // scrollDown pans the pager's viewport down, without exceeding the underlying
 // cell buffer document's boundaries.
-func (p *pager) scrollDown() bool {
+func (p *pager) scrollDown() {
 	if p.scrollY < p.maxScrollY() {
 		p.scrollY++
-		return true
 	}
-
-	return false
 }
 
 // scrollUp pans the pager's viewport up, without exceeding the underlying cell
 // buffer document's boundaries.
-func (p *pager) scrollUp() bool {
+func (p *pager) scrollUp() {
 	if p.scrollY > 0 {
 		p.scrollY--
-		return true
 	}
-
-	return false
 }
 
 // scrollLeft pans the pager's viewport left, without exceeding the underlying
 // cell buffer document's boundaries.
-func (p *pager) scrollLeft() bool {
+func (p *pager) scrollLeft() {
 	if p.scrollX < 0 {
 		p.scrollX++
-		return true
 	}
-
-	return false
 }
 
 // scrollRight pans the pager's viewport right, without exceeding the
 // underlying cell buffer document's boundaries.
-func (p *pager) scrollRight() bool {
+func (p *pager) scrollRight() {
 	if p.scrollX > -p.maxScrollX() {
 		p.scrollX--
-		return true
 	}
-
-	return false
 }
 
 // pageDown pans the pager's viewport down by a full page, without exceeding

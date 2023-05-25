@@ -2,10 +2,17 @@ package main
 
 import (
 	"archive/zip"
+	"errors"
 	"fmt"
 	"os"
 
 	"github.com/taylorskalyo/goreader/epub"
+)
+
+var (
+	// exitRequest is used as a return value from the main event loop to indicate that
+	// the app should exit.
+	exitRequest = errors.New("exit requested")
 )
 
 func main() {
@@ -35,7 +42,11 @@ func main() {
 	book := rc.Rootfiles[0]
 
 	a := app{book: book}
-	if err := a.run(); err != nil {
+	a.run()
+
+	if a.err == nil || a.err == exitRequest {
+		os.Exit(0)
+	} else {
 		os.Exit(1)
 	}
 }

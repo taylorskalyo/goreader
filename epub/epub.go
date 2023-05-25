@@ -1,7 +1,6 @@
 /*
 Package epub provides basic support for reading EPUB archives.
 */
-
 package epub
 
 import (
