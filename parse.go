@@ -160,27 +160,7 @@ func (p *parser) handleText(token html.Token) {
 func (p *parser) handleStartTag(token html.Token) {
 	switch token.DataAtom {
 	case atom.Img:
-		// Display alt text in place of images.
-		for _, a := range token.Attr {
-			switch atom.Lookup([]byte(a.Key)) {
-			case atom.Alt:
-				text := fmt.Sprintf("Alt text: %s", a.Val)
-				p.doc.appendText(text)
-				p.doc.row++
-				p.doc.col = p.doc.lmargin
-			case atom.Src:
-				for _, item := range p.items {
-					if item.HREF == a.Val {
-						for _, line := range imageToText(item) {
-							p.doc.appendText(line)
-							p.doc.col = p.doc.lmargin
-							p.doc.row++
-						}
-						break
-					}
-				}
-			}
-		}
+		p.handleImage(token)
 	case atom.Br:
 		p.doc.row++
 		p.doc.col = p.doc.lmargin
@@ -196,6 +176,31 @@ func (p *parser) handleStartTag(token html.Token) {
 		p.doc.row++
 		p.doc.col = 0
 		p.doc.appendText(strings.Repeat("-", p.doc.width))
+	}
+}
+
+// handleImage appends image elements to the parser buffer. It extracts alt
+// text and converts images to ascii art.
+func (p *parser) handleImage(token html.Token) {
+	for _, a := range token.Attr {
+		switch atom.Lookup([]byte(a.Key)) {
+		case atom.Alt:
+			text := fmt.Sprintf("Alt text: %s", a.Val)
+			p.doc.appendText(text)
+			p.doc.row++
+			p.doc.col = p.doc.lmargin
+		case atom.Src:
+			for _, item := range p.items {
+				if item.HREF == a.Val {
+					for _, line := range imageToText(item) {
+						p.doc.appendText(line)
+						p.doc.col = p.doc.lmargin
+						p.doc.row++
+					}
+					break
+				}
+			}
+		}
 	}
 }
 
