@@ -42,6 +42,7 @@ func main() {
 		os.Exit(1)
 	}
 	os.Exit(0)
+
 }
 
 func printUsage() {
@@ -53,7 +54,7 @@ func printUsage() {
 func printHelp() {
 	fmt.Fprintln(os.Stderr, "Key                  Action")
 	fmt.Fprintln(os.Stderr)
-	fmt.Fprintln(os.Stderr, "q / Esc                   Quit")
+	fmt.Fprintln(os.Stderr, "q / Esc              Quit")
 	fmt.Fprintln(os.Stderr, "k / Up arrow         Scroll up")
 	fmt.Fprintln(os.Stderr, "j / Down arrow       Scroll down")
 	fmt.Fprintln(os.Stderr, "h / Left arrow       Scroll left")
