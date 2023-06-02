@@ -2,17 +2,10 @@ package main
 
 import (
 	"archive/zip"
-	"errors"
 	"fmt"
 	"os"
 
 	"github.com/taylorskalyo/goreader/epub"
-)
-
-var (
-	// exitRequest is used as a return value from the main event loop to indicate that
-	// the app should exit.
-	exitRequest = errors.New("exit requested")
 )
 
 func main() {
@@ -41,14 +34,15 @@ func main() {
 	defer rc.Close()
 	book := rc.Rootfiles[0]
 
-	a := app{book: book}
+	a := app{book: book, exitSignal: make(chan bool, 1)}
 	a.run()
 
-	if a.err == nil || a.err == exitRequest {
-		os.Exit(0)
-	} else {
+	if a.err != nil {
+		fmt.Fprintf(os.Stderr, "Exit with error: %s\n", err.Error())
 		os.Exit(1)
 	}
+	os.Exit(0)
+
 }
 
 func printUsage() {
@@ -60,7 +54,7 @@ func printUsage() {
 func printHelp() {
 	fmt.Fprintln(os.Stderr, "Key                  Action")
 	fmt.Fprintln(os.Stderr)
-	fmt.Fprintln(os.Stderr, "q                    Quit")
+	fmt.Fprintln(os.Stderr, "q / Esc                   Quit")
 	fmt.Fprintln(os.Stderr, "k / Up arrow         Scroll up")
 	fmt.Fprintln(os.Stderr, "j / Down arrow       Scroll down")
 	fmt.Fprintln(os.Stderr, "h / Left arrow       Scroll left")

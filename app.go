@@ -12,6 +12,8 @@ type app struct {
 	chapter int
 
 	err error
+
+	exitSignal chan bool
 }
 
 // run opens a book, renders its contents within the pager, and polls for
@@ -55,7 +57,14 @@ func (a *app) run() {
 		return
 	}
 
+MainLoop:
 	for {
+		select {
+		case <-a.exitSignal:
+			break MainLoop
+		default:
+		}
+
 		if a.err = a.pager.draw(); a.err != nil {
 			return
 		}
@@ -69,16 +78,12 @@ func (a *app) run() {
 				action()
 			}
 		}
-
-		if a.err != nil {
-			break
-		}
 	}
 }
 
 // exit requests app termination.
 func (a *app) exit() {
-	a.err = exitRequest
+	a.exitSignal <- true
 }
 
 // openChapter opens the current chapter and renders it within the pager.
