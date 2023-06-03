@@ -38,7 +38,7 @@ func main() {
 	a.run()
 
 	if a.err != nil {
-		fmt.Fprintf(os.Stderr, "Exit with error: %s\n", err.Error())
+		fmt.Fprintf(os.Stderr, "Exit with error: %s\n", a.err.Error())
 		os.Exit(1)
 	}
 	os.Exit(0)
