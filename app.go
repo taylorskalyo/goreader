@@ -25,6 +25,37 @@ func (a *app) run() {
 	defer termbox.Flush()
 	defer termbox.Close()
 
+	keymap, chmap := a.initNavigationKeys()
+
+	if a.err = a.openChapter(); a.err != nil {
+		return
+	}
+
+MainLoop:
+	for {
+		select {
+		case <-a.exitSignal:
+			break MainLoop
+		default:
+		}
+
+		if a.err = a.pager.draw(); a.err != nil {
+			return
+		}
+
+		ev := termbox.PollEvent()
+		switch ev.Type {
+		case termbox.EventKey:
+			if action, ok := keymap[ev.Key]; ok {
+				action()
+			} else if action, ok := chmap[ev.Ch]; ok {
+				action()
+			}
+		}
+	}
+}
+
+func (a *app) initNavigationKeys() (map[termbox.Key]func(), map[rune]func()) {
 	keymap := map[termbox.Key]func(){
 		// Pager
 		termbox.KeyArrowDown:  a.pager.scrollDown,
@@ -53,32 +84,7 @@ func (a *app) run() {
 		'H': a.prevChapter,
 	}
 
-	if a.err = a.openChapter(); a.err != nil {
-		return
-	}
-
-MainLoop:
-	for {
-		select {
-		case <-a.exitSignal:
-			break MainLoop
-		default:
-		}
-
-		if a.err = a.pager.draw(); a.err != nil {
-			return
-		}
-
-		ev := termbox.PollEvent()
-		switch ev.Type {
-		case termbox.EventKey:
-			if action, ok := keymap[ev.Key]; ok {
-				action()
-			} else if action, ok := chmap[ev.Ch]; ok {
-				action()
-			}
-		}
-	}
+	return keymap, chmap
 }
 
 // exit requests app termination.
