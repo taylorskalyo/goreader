@@ -34,7 +34,7 @@ func main() {
 	defer rc.Close()
 	book := rc.Rootfiles[0]
 
-	a := app{book: book, exitSignal: make(chan bool, 1)}
+	a := app{book: book, pager: new(pager), exitSignal: make(chan bool, 1)}
 	a.run()
 
 	if a.err != nil {

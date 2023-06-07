@@ -8,7 +8,7 @@ import (
 
 // app is used to store the current state of the application.
 type app struct {
-	pager   pager
+	pager   pageNavigator
 	book    *epub.Rootfile
 	chapter int
 
@@ -40,7 +40,7 @@ MainLoop:
 		default:
 		}
 
-		if a.err = a.pager.draw(); a.err != nil {
+		if a.err = a.pager.Draw(); a.err != nil {
 			return
 		}
 
@@ -59,10 +59,10 @@ MainLoop:
 func (a *app) initNavigationKeys() (map[termbox.Key]func(), map[rune]func()) {
 	keymap := map[termbox.Key]func(){
 		// Pager
-		termbox.KeyArrowDown:  a.pager.scrollDown,
-		termbox.KeyArrowUp:    a.pager.scrollUp,
-		termbox.KeyArrowRight: a.pager.scrollRight,
-		termbox.KeyArrowLeft:  a.pager.scrollLeft,
+		termbox.KeyArrowDown:  a.pager.ScrollDown,
+		termbox.KeyArrowUp:    a.pager.ScrollUp,
+		termbox.KeyArrowRight: a.pager.ScrollRight,
+		termbox.KeyArrowLeft:  a.pager.ScrollLeft,
 
 		// Navigation
 		termbox.KeyEsc: a.exit,
@@ -70,12 +70,12 @@ func (a *app) initNavigationKeys() (map[termbox.Key]func(), map[rune]func()) {
 
 	chmap := map[rune]func(){
 		// Pager
-		'j': a.pager.scrollDown,
-		'k': a.pager.scrollUp,
-		'h': a.pager.scrollLeft,
-		'l': a.pager.scrollRight,
-		'g': a.pager.toTop,
-		'G': a.pager.toBottom,
+		'j': a.pager.ScrollDown,
+		'k': a.pager.ScrollUp,
+		'h': a.pager.ScrollLeft,
+		'l': a.pager.ScrollRight,
+		'g': a.pager.ToTop,
+		'G': a.pager.ToBottom,
 
 		// Navigation
 		'q': a.exit,
@@ -103,32 +103,32 @@ func (a *app) openChapter() error {
 	if err != nil {
 		return err
 	}
-	a.pager.doc = doc
+	a.pager.SetDoc(doc)
 
 	return nil
 }
 
 // forward pages down or opens the next chapter.
 func (a *app) forward() {
-	if a.pager.pageDown() || a.chapter >= len(a.book.Spine.Itemrefs)-1 {
+	if a.pager.PageDown() || a.chapter >= len(a.book.Spine.Itemrefs)-1 {
 		return
 	}
 
 	// We reached the bottom.
 	if a.nextChapter(); a.err == nil {
-		a.pager.toTop()
+		a.pager.ToTop()
 	}
 }
 
 // back pages up or opens the previous chapter.
 func (a *app) back() {
-	if a.pager.pageUp() || a.chapter <= 0 {
+	if a.pager.PageUp() || a.chapter <= 0 {
 		return
 	}
 
 	// We reached the top.
 	if a.prevChapter(); a.err == nil {
-		a.pager.toBottom()
+		a.pager.ToBottom()
 	}
 }
 
@@ -140,7 +140,7 @@ func (a *app) nextChapter() {
 
 	a.chapter++
 	if a.err = a.openChapter(); a.err == nil {
-		a.pager.toTop()
+		a.pager.ToTop()
 	}
 }
 
@@ -152,6 +152,6 @@ func (a *app) prevChapter() {
 
 	a.chapter--
 	if a.err = a.openChapter(); a.err == nil {
-		a.pager.toTop()
+		a.pager.ToTop()
 	}
 }
