@@ -1,4 +1,4 @@
-package main
+package parse
 
 import (
 	"bufio"
@@ -24,13 +24,13 @@ import (
 type parser struct {
 	tagStack  []atom.Atom
 	tokenizer *html.Tokenizer
-	doc       cellbuf
+	doc       Cellbuf
 	items     []epub.Item
 }
 
-type cellbuf struct {
-	cells   []termbox.Cell
-	width   int
+type Cellbuf struct {
+	Cells   []termbox.Cell
+	Width   int
 	lmargin int
 	col     int
 	row     int
@@ -40,17 +40,17 @@ type cellbuf struct {
 
 // setCell changes a cell's attributes in the cell buffer document at the given
 // position.
-func (c *cellbuf) setCell(x, y int, ch rune, fg, bg termbox.Attribute) {
+func (c *Cellbuf) setCell(x, y int, ch rune, fg, bg termbox.Attribute) {
 	// Grow in steps of 1024 when out of space.
-	for y*c.width+x >= len(c.cells) {
-		c.cells = append(c.cells, make([]termbox.Cell, 1024)...)
+	for y*c.Width+x >= len(c.Cells) {
+		c.Cells = append(c.Cells, make([]termbox.Cell, 1024)...)
 	}
-	c.cells[y*c.width+x] = termbox.Cell{Ch: ch, Fg: fg, Bg: bg}
+	c.Cells[y*c.Width+x] = termbox.Cell{Ch: ch, Fg: fg, Bg: bg}
 }
 
 // style sets the foreground/background attributes for future cells in the cell
 // buffer document based on HTML tags in the tag stack.
-func (c *cellbuf) style(tags []atom.Atom) {
+func (c *Cellbuf) style(tags []atom.Atom) {
 	fg := termbox.ColorDefault
 	for _, tag := range tags {
 		switch tag {
@@ -72,7 +72,7 @@ func (c *cellbuf) style(tags []atom.Atom) {
 }
 
 // appendText appends text to the cell buffer document.
-func (c *cellbuf) appendText(str string) {
+func (c *Cellbuf) appendText(str string) {
 	if len(str) <= 0 {
 		return
 	}
@@ -90,7 +90,7 @@ func (c *cellbuf) appendText(str string) {
 			c.col++
 		}
 		word := []rune(scanner.Text())
-		if len(word) > c.width-c.col {
+		if len(word) > c.Width-c.col {
 			c.row++
 			c.col = c.lmargin
 		}
@@ -107,9 +107,9 @@ func (c *cellbuf) appendText(str string) {
 
 // parseText takes in html content via an io.Reader and returns a buffer
 // containing only plain text.
-func parseText(r io.Reader, items []epub.Item) (cellbuf, error) {
+func ParseText(r io.Reader, items []epub.Item) (Cellbuf, error) {
 	tokenizer := html.NewTokenizer(r)
-	doc := cellbuf{width: 80}
+	doc := Cellbuf{Width: 80}
 	p := parser{tokenizer: tokenizer, doc: doc, items: items}
 	err := p.parse(r)
 	if err != nil {
@@ -175,7 +175,7 @@ func (p *parser) handleStartTag(token html.Token) {
 	case atom.Hr:
 		p.doc.row++
 		p.doc.col = 0
-		p.doc.appendText(strings.Repeat("-", p.doc.width))
+		p.doc.appendText(strings.Repeat("-", p.doc.Width))
 	}
 }
 

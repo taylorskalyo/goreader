@@ -3,6 +3,7 @@ package main
 import (
 	termbox "github.com/nsf/termbox-go"
 	"github.com/taylorskalyo/goreader/epub"
+	"github.com/taylorskalyo/goreader/parse"
 )
 
 // app is used to store the current state of the application.
@@ -98,7 +99,7 @@ func (a *app) openChapter() error {
 	if err != nil {
 		return err
 	}
-	doc, err := parseText(f, a.book.Manifest.Items)
+	doc, err := parse.ParseText(f, a.book.Manifest.Items)
 	if err != nil {
 		return err
 	}

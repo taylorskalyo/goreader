@@ -1,11 +1,14 @@
 package main
 
-import termbox "github.com/nsf/termbox-go"
+import (
+	termbox "github.com/nsf/termbox-go"
+	"github.com/taylorskalyo/goreader/parse"
+)
 
 type pager struct {
 	scrollX int
 	scrollY int
-	doc     cellbuf
+	doc     parse.Cellbuf
 }
 
 // draw displays a pager's cell buffer in the terminal.
@@ -15,14 +18,14 @@ func (p pager) draw() error {
 	width, height := termbox.Size()
 	var centerOffset int
 	for y := 0; y < height; y++ {
-		for x := 0; x < p.doc.width; x++ {
-			index := (y+p.scrollY)*p.doc.width + x
-			if index >= len(p.doc.cells) || index <= 0 {
+		for x := 0; x < p.doc.Width; x++ {
+			index := (y+p.scrollY)*p.doc.Width + x
+			if index >= len(p.doc.Cells) || index <= 0 {
 				continue
 			}
-			cell := p.doc.cells[index]
-			if width > p.doc.width {
-				centerOffset = (width - p.doc.width) / 2
+			cell := p.doc.Cells[index]
+			if width > p.doc.Width {
+				centerOffset = (width - p.doc.Width) / 2
 			}
 
 			// Calling SetCell with coordinates outside of the terminal viewport
@@ -125,8 +128,8 @@ func (p pager) maxScrollY() int {
 // size returns the width and height of the pager's underlying cell buffer
 // document.
 func (p pager) size() (int, int) {
-	height := len(p.doc.cells) / p.doc.width
-	return p.doc.width, height
+	height := len(p.doc.Cells) / p.doc.Width
+	return p.doc.Width, height
 }
 
 // pages returns the number of times the pager's underlying cell buffer
