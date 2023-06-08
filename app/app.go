@@ -1,15 +1,28 @@
-package main
+package app
 
 import (
 	termbox "github.com/nsf/termbox-go"
 	"github.com/taylorskalyo/goreader/epub"
+	"github.com/taylorskalyo/goreader/nav"
 	"github.com/taylorskalyo/goreader/parse"
 )
 
+type Application interface {
+	Forward()
+	Back()
+	NextChapter()
+	PrevChapter()
+
+	PageNavigator() nav.PageNavigator
+	Exit()
+	Run()
+	Err() error
+}
+
 // app is used to store the current state of the application.
 type app struct {
-	pager   pageNavigator
 	book    *epub.Rootfile
+	pager   nav.PageNavigator
 	chapter int
 
 	err error
@@ -17,16 +30,21 @@ type app struct {
 	exitSignal chan bool
 }
 
-// run opens a book, renders its contents within the pager, and polls for
+// NewApp creates an App
+func NewApp(b *epub.Rootfile, p nav.PageNavigator) Application {
+	return &app{pager: p, book: b, exitSignal: make(chan bool, 1)}
+}
+
+// Run opens a book, renders its contents within the pager, and polls for
 // terminal events until an error occurs or an exit event is detected.
-func (a *app) run() {
+func (a *app) Run() {
 	if a.err = termbox.Init(); a.err != nil {
 		return
 	}
 	defer termbox.Flush()
 	defer termbox.Close()
 
-	keymap, chmap := a.initNavigationKeys()
+	keymap, chmap := initNavigationKeys(a)
 
 	if a.err = a.openChapter(); a.err != nil {
 		return
@@ -56,40 +74,48 @@ MainLoop:
 	}
 }
 
-func (a *app) initNavigationKeys() (map[termbox.Key]func(), map[rune]func()) {
+func (a *app) Err() error {
+	return a.err
+}
+
+func (a *app) PageNavigator() nav.PageNavigator {
+	return a.pager
+}
+
+func initNavigationKeys(a Application) (map[termbox.Key]func(), map[rune]func()) {
 	keymap := map[termbox.Key]func(){
 		// Pager
-		termbox.KeyArrowDown:  a.pager.ScrollDown,
-		termbox.KeyArrowUp:    a.pager.ScrollUp,
-		termbox.KeyArrowRight: a.pager.ScrollRight,
-		termbox.KeyArrowLeft:  a.pager.ScrollLeft,
+		termbox.KeyArrowDown:  a.PageNavigator().ScrollDown,
+		termbox.KeyArrowUp:    a.PageNavigator().ScrollUp,
+		termbox.KeyArrowRight: a.PageNavigator().ScrollRight,
+		termbox.KeyArrowLeft:  a.PageNavigator().ScrollLeft,
 
 		// Navigation
-		termbox.KeyEsc: a.exit,
+		termbox.KeyEsc: a.Exit,
 	}
 
 	chmap := map[rune]func(){
-		// Pager
-		'j': a.pager.ScrollDown,
-		'k': a.pager.ScrollUp,
-		'h': a.pager.ScrollLeft,
-		'l': a.pager.ScrollRight,
-		'g': a.pager.ToTop,
-		'G': a.pager.ToBottom,
+		// PageNavigator
+		'j': a.PageNavigator().ScrollDown,
+		'k': a.PageNavigator().ScrollUp,
+		'h': a.PageNavigator().ScrollLeft,
+		'l': a.PageNavigator().ScrollRight,
+		'g': a.PageNavigator().ToTop,
+		'G': a.PageNavigator().ToBottom,
 
 		// Navigation
-		'q': a.exit,
-		'f': a.forward,
-		'b': a.back,
-		'L': a.nextChapter,
-		'H': a.prevChapter,
+		'q': a.Exit,
+		'f': a.Forward,
+		'b': a.Back,
+		'L': a.NextChapter,
+		'H': a.PrevChapter,
 	}
 
 	return keymap, chmap
 }
 
-// exit requests app termination.
-func (a *app) exit() {
+// Exit requests app termination.
+func (a *app) Exit() {
 	a.exitSignal <- true
 }
 
@@ -108,32 +134,32 @@ func (a *app) openChapter() error {
 	return nil
 }
 
-// forward pages down or opens the next chapter.
-func (a *app) forward() {
+// Forward pages down or opens the next chapter.
+func (a *app) Forward() {
 	if a.pager.PageDown() || a.chapter >= len(a.book.Spine.Itemrefs)-1 {
 		return
 	}
 
 	// We reached the bottom.
-	if a.nextChapter(); a.err == nil {
+	if a.NextChapter(); a.err == nil {
 		a.pager.ToTop()
 	}
 }
 
-// back pages up or opens the previous chapter.
-func (a *app) back() {
+// Back pages up or opens the previous chapter.
+func (a *app) Back() {
 	if a.pager.PageUp() || a.chapter <= 0 {
 		return
 	}
 
 	// We reached the top.
-	if a.prevChapter(); a.err == nil {
+	if a.PrevChapter(); a.err == nil {
 		a.pager.ToBottom()
 	}
 }
 
 // nextChapter opens the next chapter.
-func (a *app) nextChapter() {
+func (a *app) NextChapter() {
 	if a.chapter >= len(a.book.Spine.Itemrefs)-1 {
 		return
 	}
@@ -145,7 +171,7 @@ func (a *app) nextChapter() {
 }
 
 // prevChapter opens the previous chapter.
-func (a *app) prevChapter() {
+func (a *app) PrevChapter() {
 	if a.chapter <= 0 {
 		return
 	}

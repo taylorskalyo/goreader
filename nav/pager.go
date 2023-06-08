@@ -1,11 +1,11 @@
-package main
+package nav
 
 import (
 	termbox "github.com/nsf/termbox-go"
 	"github.com/taylorskalyo/goreader/parse"
 )
 
-type pageNavigator interface {
+type PageNavigator interface {
 	Draw() error
 	MaxScrollX() int
 	MaxScrollY() int
@@ -22,19 +22,19 @@ type pageNavigator interface {
 	ToTop()
 }
 
-type pager struct {
+type Pager struct {
 	scrollX int
 	scrollY int
 	doc     parse.Cellbuf
 }
 
 // setDoc sets the pager's cell buffer
-func (p *pager) SetDoc(doc parse.Cellbuf) {
+func (p *Pager) SetDoc(doc parse.Cellbuf) {
 	p.doc = doc
 }
 
 // Draw displays a pager's cell buffer in the terminal.
-func (p *pager) Draw() error {
+func (p *Pager) Draw() error {
 	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 
 	width, height := termbox.Size()
@@ -61,7 +61,7 @@ func (p *pager) Draw() error {
 
 // scrollDown pans the pager's viewport down, without exceeding the underlying
 // cell buffer document's boundaries.
-func (p *pager) ScrollDown() {
+func (p *Pager) ScrollDown() {
 	if p.scrollY < p.MaxScrollY() {
 		p.scrollY++
 	}
@@ -69,7 +69,7 @@ func (p *pager) ScrollDown() {
 
 // scrollUp pans the pager's viewport up, without exceeding the underlying cell
 // buffer document's boundaries.
-func (p *pager) ScrollUp() {
+func (p *Pager) ScrollUp() {
 	if p.scrollY > 0 {
 		p.scrollY--
 	}
@@ -77,7 +77,7 @@ func (p *pager) ScrollUp() {
 
 // scrollLeft pans the pager's viewport left, without exceeding the underlying
 // cell buffer document's boundaries.
-func (p *pager) ScrollLeft() {
+func (p *Pager) ScrollLeft() {
 	if p.scrollX < 0 {
 		p.scrollX++
 	}
@@ -85,7 +85,7 @@ func (p *pager) ScrollLeft() {
 
 // scrollRight pans the pager's viewport right, without exceeding the
 // underlying cell buffer document's boundaries.
-func (p *pager) ScrollRight() {
+func (p *Pager) ScrollRight() {
 	if p.scrollX > -p.MaxScrollX() {
 		p.scrollX--
 	}
@@ -93,7 +93,7 @@ func (p *pager) ScrollRight() {
 
 // pageDown pans the pager's viewport down by a full page, without exceeding
 // the underlying cell buffer document's boundaries.
-func (p *pager) PageDown() bool {
+func (p *Pager) PageDown() bool {
 	_, viewHeight := termbox.Size()
 	if p.scrollY < p.MaxScrollY() {
 		p.scrollY += viewHeight
@@ -105,7 +105,7 @@ func (p *pager) PageDown() bool {
 
 // pageUp pans the pager's viewport up by a full page, without exceeding the
 // underlying cell buffer document's boundaries.
-func (p *pager) PageUp() bool {
+func (p *Pager) PageUp() bool {
 	_, viewHeight := termbox.Size()
 	if p.scrollY > viewHeight {
 		p.scrollY -= viewHeight
@@ -120,28 +120,28 @@ func (p *pager) PageUp() bool {
 
 // toTop set's the pager's horizontal and vertical panning distance back to
 // zero.
-func (p *pager) ToTop() {
+func (p *Pager) ToTop() {
 	p.scrollX = 0
 	p.scrollY = 0
 }
 
 // toBottom set's the pager's horizontal panning distance back to zero and
 // vertical panning distance to the last viewport page.
-func (p *pager) ToBottom() {
+func (p *Pager) ToBottom() {
 	_, viewHeight := termbox.Size()
 	p.scrollX = 0
 	p.scrollY = p.Pages() * viewHeight
 }
 
 // maxScrollX represents the pager's maximum horizontal scroll distance.
-func (p *pager) MaxScrollX() int {
+func (p *Pager) MaxScrollX() int {
 	docWidth, _ := p.Size()
 	viewWidth, _ := termbox.Size()
 	return docWidth - viewWidth
 }
 
 // maxScrollY represents the pager's maximum vertical scroll distance.
-func (p *pager) MaxScrollY() int {
+func (p *Pager) MaxScrollY() int {
 	_, docHeight := p.Size()
 	_, viewHeight := termbox.Size()
 	return docHeight - viewHeight
@@ -149,14 +149,14 @@ func (p *pager) MaxScrollY() int {
 
 // size returns the width and height of the pager's underlying cell buffer
 // document.
-func (p *pager) Size() (int, int) {
+func (p *Pager) Size() (int, int) {
 	height := len(p.doc.Cells) / p.doc.Width
 	return p.doc.Width, height
 }
 
 // pages returns the number of times the pager's underlying cell buffer
 // document can be split into viewport sized pages.
-func (p *pager) Pages() int {
+func (p *Pager) Pages() int {
 	_, docHeight := p.Size()
 	_, viewHeight := termbox.Size()
 	return docHeight / viewHeight

@@ -22,11 +22,13 @@ func (p *MockPageNavigator) MaxScrollY() int {
 }
 
 func (p *MockPageNavigator) PageDown() bool {
-	panic("not implemented") // TODO: Implement
+	p.Called()
+	return false
 }
 
 func (p *MockPageNavigator) PageUp() bool {
-	panic("not implemented") // TODO: Implement
+	p.Called()
+	return false
 }
 
 func (p *MockPageNavigator) Pages() int {
@@ -58,9 +60,9 @@ func (p *MockPageNavigator) Size() (int, int) {
 }
 
 func (p *MockPageNavigator) ToBottom() {
-	panic("not implemented") // TODO: Implement
+	p.Called()
 }
 
 func (p *MockPageNavigator) ToTop() {
-	panic("not implemented") // TODO: Implement
+	p.Called()
 }

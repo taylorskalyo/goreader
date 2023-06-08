@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/taylorskalyo/goreader/app"
 	"github.com/taylorskalyo/goreader/epub"
+	"github.com/taylorskalyo/goreader/nav"
 )
 
 func main() {
@@ -34,11 +36,11 @@ func main() {
 	defer rc.Close()
 	book := rc.Rootfiles[0]
 
-	a := app{book: book, pager: new(pager), exitSignal: make(chan bool, 1)}
-	a.run()
+	a := app.NewApp(book, new(nav.Pager))
+	a.Run()
 
-	if a.err != nil {
-		fmt.Fprintf(os.Stderr, "Exit with error: %s\n", a.err.Error())
+	if a.Err() != nil {
+		fmt.Fprintf(os.Stderr, "Exit with error: %s\n", a.Err().Error())
 		os.Exit(1)
 	}
 	os.Exit(0)
