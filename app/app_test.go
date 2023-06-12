@@ -2,6 +2,7 @@ package app
 
 import (
 	"testing"
+	"unicode"
 
 	termbox "github.com/nsf/termbox-go"
 	localMock "github.com/taylorskalyo/goreader/mock"
@@ -12,39 +13,37 @@ func TestInitNavigationKeys(t *testing.T) {
 	a := localMock.NewMockApplication(p)
 
 	a.On("PageNavigator").Return(p)
-	a.On("Exit").Return()
-	a.On("Forward").Return()
-	a.On("Back").Return()
-	a.On("NextChapter").Return()
-	a.On("PrevChapter").Return()
-
-	p.On("ScrollDown").Return()
-	p.On("ScrollUp").Return()
-	p.On("ScrollLeft").Return()
-	p.On("ScrollRight").Return()
-	p.On("ToTop").Return()
-	p.On("ToBottom").Return()
 
 	keymap, chmap := initNavigationKeys(a)
 
-	keymap[termbox.KeyArrowDown]()
-	keymap[termbox.KeyArrowUp]()
-	keymap[termbox.KeyArrowRight]()
-	keymap[termbox.KeyArrowLeft]()
-	keymap[termbox.KeyEsc]()
+	var zeroValueTermboxKey termbox.Key
 
-	chmap['j']()
-	chmap['k']()
-	chmap['h']()
-	chmap['l']()
-	chmap['g']()
-	chmap['G']()
+	verifyMethodCall := func(receiver string, methodName string, letterKey rune, tbKey termbox.Key) {
+		if receiver == "pager" {
+			p.On(methodName).Return()
+		}
+		if receiver == "app" {
+			a.On(methodName).Return()
+		}
 
-	chmap['q']()
-	chmap['f']()
-	chmap['b']()
-	chmap['L']()
-	chmap['H']()
+		if unicode.IsLetter(letterKey) {
+			chmap[letterKey]()
+		}
+		if tbKey != zeroValueTermboxKey {
+			keymap[termbox.KeyArrowUp]()
+		}
 
-	p.AssertExpectations(t)
+		p.AssertExpectations(t)
+	}
+	verifyMethodCall("pager", "ScrollUp", 'k', termbox.KeyArrowUp)
+	verifyMethodCall("pager", "ScrollDown", 'j', termbox.KeyArrowDown)
+	verifyMethodCall("pager", "ScrollLeft", 'h', termbox.KeyArrowLeft)
+	verifyMethodCall("pager", "ScrollRight", 'l', termbox.KeyArrowRight)
+	verifyMethodCall("pager", "ToTop", 'g', zeroValueTermboxKey)
+	verifyMethodCall("pager", "ToBottom", 'G', zeroValueTermboxKey)
+	verifyMethodCall("app", "Forward", 'f', zeroValueTermboxKey)
+	verifyMethodCall("app", "Back", 'b', zeroValueTermboxKey)
+	verifyMethodCall("app", "NextChapter", 'L', zeroValueTermboxKey)
+	verifyMethodCall("app", "PrevChapter", 'H', zeroValueTermboxKey)
+	verifyMethodCall("app", "Exit", 'q', termbox.KeyEsc)
 }
