@@ -19,11 +19,20 @@ func TestInitNavigationKeys(t *testing.T) {
 	verifyMethodCall := func(receiver *mock.Mock, methodName string, input any) {
 		receiver.On(methodName).Return()
 
-		if ch, ok := input.(rune); ok {
-			chmap[ch]()
-		} else if key, ok := input.(termbox.Key); ok {
-			keymap[key]()
-		} else {
+		switch v := input.(type) {
+		case rune:
+			if fn, ok := chmap[v]; ok {
+				fn()
+			} else {
+				t.Errorf("unhandled input character: %c", v)
+			}
+		case termbox.Key:
+			if fn, ok := keymap[v]; ok {
+				fn()
+			} else {
+				t.Errorf("unhandled input key: %#x", input)
+			}
+		default:
 			t.Errorf("unhandled input: %+v", input)
 		}
 
