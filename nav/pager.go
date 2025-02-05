@@ -35,7 +35,10 @@ func (p *Pager) SetDoc(doc parse.Cellbuf) {
 
 // Draw displays a pager's cell buffer in the terminal.
 func (p *Pager) Draw() error {
-	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
+	err := termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
+	if err != nil {
+		return err
+	}
 
 	width, height := termbox.Size()
 	var centerOffset int
