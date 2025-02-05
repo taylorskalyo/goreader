@@ -22,7 +22,7 @@ goreader [epub_file]
 
 | Key               | Action            |
 | ----------------- | ----------------- |
-| `q`               | Quit              |
+| `q` / Escape      | Quit              |
 | `k` / Up arrow    | Scroll up         |
 | `j` / Down arrow  | Scroll down       |
 | `h` / Left arrow  | Scroll left       |

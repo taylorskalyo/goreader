@@ -1,21 +1,26 @@
-name: Test
+name: Main branch requirements
 
 on:
   push:
-    branches: [ master ]
+    branches:
+      - main
   pull_request:
-    branches: [ master ]
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: 'stable'
+
+      - name: Lint
+        uses: golangci/golangci-lint-action@v6
 
       - name: Test
         run: go test -v ./...
