@@ -59,7 +59,7 @@ func (a *app) Run() int {
 		}
 
 		if a.err = a.pager.Draw(); a.err != nil {
-			return a.chapter
+			return 0
 		}
 
 		ev := termbox.PollEvent()
