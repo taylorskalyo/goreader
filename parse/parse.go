@@ -13,8 +13,8 @@ import (
 	_ "image/jpeg"
 	_ "image/png"
 
+	"github.com/gdamore/tcell/v2"
 	"github.com/nfnt/resize"
-	termbox "github.com/nsf/termbox-go"
 	"github.com/taylorskalyo/goreader/epub"
 
 	"golang.org/x/net/html"
@@ -29,46 +29,46 @@ type parser struct {
 }
 
 type Cellbuf struct {
-	Cells   []termbox.Cell
+	Cells   []tcell.SimCell
 	Width   int
 	lmargin int
 	col     int
 	row     int
 	space   bool
-	fg, bg  termbox.Attribute
+	style   tcell.Style
 }
 
 // setCell changes a cell's attributes in the cell buffer document at the given
 // position.
-func (c *Cellbuf) setCell(x, y int, ch rune, fg, bg termbox.Attribute) {
+func (c *Cellbuf) setCell(x, y int, runes []rune, style tcell.Style) {
 	// Grow in steps of 1024 when out of space.
 	for y*c.Width+x >= len(c.Cells) {
-		c.Cells = append(c.Cells, make([]termbox.Cell, 1024)...)
+		c.Cells = append(c.Cells, make([]tcell.SimCell, 1024)...)
 	}
-	c.Cells[y*c.Width+x] = termbox.Cell{Ch: ch, Fg: fg, Bg: bg}
+	c.Cells[y*c.Width+x] = tcell.SimCell{Runes: runes, Style: style}
 }
 
 // style sets the foreground/background attributes for future cells in the cell
 // buffer document based on HTML tags in the tag stack.
-func (c *Cellbuf) style(tags []atom.Atom) {
-	fg := termbox.ColorDefault
+func (c *Cellbuf) setStyle(tags []atom.Atom) {
+	style := tcell.StyleDefault
 	for _, tag := range tags {
 		switch tag {
 		case atom.B, atom.Strong, atom.Em:
-			fg |= termbox.AttrBold
+			style = style.Bold(true)
 		case atom.I:
-			fg |= termbox.ColorYellow
+			style = style.Foreground(tcell.ColorOlive)
 		case atom.Title:
-			fg |= termbox.ColorRed
+			style = style.Foreground(tcell.ColorMaroon)
 		case atom.H1:
-			fg |= termbox.ColorMagenta
+			style = style.Foreground(tcell.ColorPurple)
 		case atom.H2:
-			fg |= termbox.ColorBlue
+			style = style.Foreground(tcell.ColorNavy)
 		case atom.H3, atom.H4, atom.H5, atom.H6:
-			fg |= termbox.ColorCyan
+			style = style.Foreground(tcell.ColorTeal)
 		}
 	}
-	c.fg = fg
+	c.style = style
 }
 
 // appendText appends text to the cell buffer document.
@@ -95,7 +95,7 @@ func (c *Cellbuf) appendText(str string) {
 			c.col = c.lmargin
 		}
 		for _, r := range word {
-			c.setCell(c.col, c.row, r, c.fg, c.bg)
+			c.setCell(c.col, c.row, []rune{r}, c.style)
 			c.col++
 		}
 		c.space = true
@@ -151,7 +151,7 @@ func (p *parser) handleText(token html.Token) {
 	if len(p.tagStack) > 0 && p.tagStack[len(p.tagStack)-1] == atom.Style {
 		return
 	}
-	p.doc.style(p.tagStack)
+	p.doc.setStyle(p.tagStack)
 	p.doc.appendText(string(token.Data))
 }
 
