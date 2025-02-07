@@ -85,7 +85,7 @@ func printHelp() {
 }
 
 // savePage saves the name of the current epub (as a key) and the current chapter number (as an value)
-// to a .xml file in $XDG_STATE_HOME, either creating or updating it.
+// to a .json file in $XDG_STATE_HOME, either creating or updating it.
 // It returns any error that occurs during the process.
 func savePage(chapter int, title string) error {
 	if chapter == 0 {
