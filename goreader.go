@@ -88,10 +88,6 @@ func printHelp() {
 // to a .json file in $XDG_STATE_HOME, either creating or updating it.
 // It returns any error that occurs during the process.
 func savePage(chapter int, title string) error {
-	if chapter == 0 {
-		return nil
-	}
-
 	stateDir := xdg.StateHome
 	appStateDir := filepath.Join(stateDir, "goreader")
 	stateFile := filepath.Join(appStateDir, "last_read_pages.json")
