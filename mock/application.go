@@ -21,7 +21,6 @@ func (a *MockApplication) PageNavigator() nav.PageNavigator {
 
 func (a *MockApplication) Exit() {
 	a.Called()
-
 }
 
 func (a *MockApplication) Forward() {
@@ -45,6 +44,7 @@ func (a *MockApplication) Err() error {
 	return nil
 }
 
-func (a *MockApplication) Run() {
+func (a *MockApplication) Run() int {
 	a.Called()
+	return 0
 }
