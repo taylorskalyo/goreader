@@ -1,7 +1,7 @@
 package app
 
 import (
-	termbox "github.com/nsf/termbox-go"
+	"github.com/gdamore/tcell/v2"
 	"github.com/taylorskalyo/goreader/epub"
 	"github.com/taylorskalyo/goreader/nav"
 	"github.com/taylorskalyo/goreader/parse"
@@ -38,11 +38,13 @@ func NewApp(b *epub.Rootfile, p nav.PageNavigator) Application {
 // Run opens a book, renders its contents within the pager, and polls for
 // terminal events until an error occurs or an exit event is detected.
 func (a *app) Run() {
-	if a.err = termbox.Init(); a.err != nil {
+	var screen tcell.Screen
+
+	if screen, a.err = initScreen(); a.err != nil {
 		return
 	}
-	defer termbox.Flush()
-	defer termbox.Close()
+	defer screen.Fini()
+	a.pager.SetScreen(screen)
 
 	keymap, chmap := initNavigationKeys(a)
 
@@ -50,24 +52,21 @@ func (a *app) Run() {
 		return
 	}
 
-MainLoop:
 	for {
 		select {
 		case <-a.exitSignal:
-			break MainLoop
+			return
 		default:
 		}
 
-		if a.err = a.pager.Draw(); a.err != nil {
-			return
-		}
+		a.pager.Draw()
 
-		ev := termbox.PollEvent()
-		switch ev.Type {
-		case termbox.EventKey:
-			if action, ok := keymap[ev.Key]; ok {
+		ev := screen.PollEvent()
+		switch ev := ev.(type) {
+		case *tcell.EventKey:
+			if action, ok := keymap[ev.Key()]; ok {
 				action()
-			} else if action, ok := chmap[ev.Ch]; ok {
+			} else if action, ok := chmap[ev.Rune()]; ok {
 				action()
 			}
 		}
@@ -82,18 +81,26 @@ func (a *app) PageNavigator() nav.PageNavigator {
 	return a.pager
 }
 
-func initNavigationKeys(a Application) (map[termbox.Key]func(), map[rune]func()) {
-	keymap := map[termbox.Key]func(){
-		// Pager
-		termbox.KeyArrowDown:  a.PageNavigator().ScrollDown,
-		termbox.KeyArrowUp:    a.PageNavigator().ScrollUp,
-		termbox.KeyArrowRight: a.PageNavigator().ScrollRight,
-		termbox.KeyArrowLeft:  a.PageNavigator().ScrollLeft,
-
-		// Navigation
-		termbox.KeyEsc: a.Exit,
+func initScreen() (tcell.Screen, error) {
+	screen, err := tcell.NewScreen()
+	if err == nil {
+		err = screen.Init()
 	}
 
+	return screen, err
+}
+
+func initNavigationKeys(a Application) (map[tcell.Key]func(), map[rune]func()) {
+	keymap := map[tcell.Key]func(){
+		// Pager
+		tcell.KeyDown:  a.PageNavigator().ScrollDown,
+		tcell.KeyUp:    a.PageNavigator().ScrollUp,
+		tcell.KeyRight: a.PageNavigator().ScrollRight,
+		tcell.KeyLeft:  a.PageNavigator().ScrollLeft,
+
+		// Navigation
+		tcell.KeyEsc: a.Exit,
+	}
 	chmap := map[rune]func(){
 		// PageNavigator
 		'j': a.PageNavigator().ScrollDown,

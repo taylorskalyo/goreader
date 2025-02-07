@@ -21,7 +21,6 @@ func (a *MockApplication) PageNavigator() nav.PageNavigator {
 
 func (a *MockApplication) Exit() {
 	a.Called()
-
 }
 
 func (a *MockApplication) Forward() {

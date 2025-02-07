@@ -1,6 +1,7 @@
 package mock
 
 import (
+	"github.com/gdamore/tcell/v2"
 	"github.com/stretchr/testify/mock"
 	"github.com/taylorskalyo/goreader/parse"
 )
@@ -9,7 +10,7 @@ type MockPageNavigator struct {
 	mock.Mock
 }
 
-func (p *MockPageNavigator) Draw() error {
+func (p *MockPageNavigator) Draw() {
 	panic("not implemented") // TODO: Implement
 }
 
@@ -52,6 +53,10 @@ func (p *MockPageNavigator) ScrollUp() {
 }
 
 func (p *MockPageNavigator) SetDoc(_ parse.Cellbuf) {
+	panic("not implemented") // TODO: Implement
+}
+
+func (p *MockPageNavigator) SetScreen(_ tcell.Screen) {
 	panic("not implemented") // TODO: Implement
 }
 
