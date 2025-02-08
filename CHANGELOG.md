@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/taylorskalyo/goreader/compare/v1.0.1...v1.1.0) (2025-02-08)
+
+
+### Features
+
+* save and persist last read chapter state ([#19](https://github.com/taylorskalyo/goreader/issues/19)) ([8f8e8d0](https://github.com/taylorskalyo/goreader/commit/8f8e8d0187e6fee1bea2a3e6eb55815c61d7a4e4))
+
 ## [1.0.1](https://github.com/taylorskalyo/goreader/compare/v1.0.0...v1.0.1) (2025-02-07)
 
 
