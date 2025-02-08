@@ -21,6 +21,8 @@ type PageNavigator interface {
 	Size() (int, int)
 	ToBottom()
 	ToTop()
+	Position() float64
+	SetPosition(float64)
 }
 
 type Pager struct {
@@ -58,8 +60,8 @@ func (p *Pager) Draw() {
 			}
 
 			if len(cell.Runes) > 0 {
-        // Calling SetContent with coordinates outside of the terminal viewport
-        // results in a no-op.
+				// Calling SetContent with coordinates outside of the terminal viewport
+				// results in a no-op.
 				p.screen.SetContent(x+p.scrollX+centerOffset, y, cell.Runes[0], cell.Runes[1:], cell.Style)
 			}
 		}
@@ -143,14 +145,14 @@ func (p *Pager) ToBottom() {
 }
 
 // maxScrollX represents the pager's maximum horizontal scroll distance.
-func (p *Pager) MaxScrollX() int {
+func (p Pager) MaxScrollX() int {
 	docWidth, _ := p.Size()
 	viewWidth, _ := p.screen.Size()
 	return docWidth - viewWidth
 }
 
 // maxScrollY represents the pager's maximum vertical scroll distance.
-func (p *Pager) MaxScrollY() int {
+func (p Pager) MaxScrollY() int {
 	_, docHeight := p.Size()
 	_, viewHeight := p.screen.Size()
 	return docHeight - viewHeight
@@ -158,15 +160,28 @@ func (p *Pager) MaxScrollY() int {
 
 // size returns the width and height of the pager's underlying cell buffer
 // document.
-func (p *Pager) Size() (int, int) {
+func (p Pager) Size() (int, int) {
 	height := len(p.doc.Cells) / p.doc.Width
 	return p.doc.Width, height
 }
 
 // pages returns the number of times the pager's underlying cell buffer
 // document can be split into viewport sized pages.
-func (p *Pager) Pages() int {
+func (p Pager) Pages() int {
 	_, docHeight := p.Size()
 	_, viewHeight := p.screen.Size()
 	return docHeight / viewHeight
+}
+
+// Position returns the position of the view port within the document as a
+// percentage.
+func (p Pager) Position() float64 {
+	_, docHeight := p.Size()
+	return float64(p.scrollY) / float64(docHeight)
+}
+
+// SetPosition sets the position of the view port within the document.
+func (p *Pager) SetPosition(pos float64) {
+	_, docHeight := p.Size()
+	p.scrollY = int(float64(docHeight) * pos)
 }

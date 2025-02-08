@@ -67,19 +67,25 @@ type Package struct {
 	Spine
 }
 
+type Identifier struct {
+}
+
 // Metadata contains publishing information about the epub.
 type Metadata struct {
-	Title       string `xml:"metadata>title"`
-	Language    string `xml:"metadata>language"`
-	Identifier  string `xml:"metadata>idenifier"`
+	Title      string `xml:"metadata>title"`
+	Language   string `xml:"metadata>language"`
+	Identifier struct {
+		Scheme  string `xml:"scheme,attr"`
+		Content string `xml:",innerxml"`
+	} `xml:"metadata>identifier"`
 	Creator     string `xml:"metadata>creator"`
 	Contributor string `xml:"metadata>contributor"`
 	Publisher   string `xml:"metadata>publisher"`
 	Subject     string `xml:"metadata>subject"`
 	Description string `xml:"metadata>description"`
-	Event       []struct {
-		Name string `xml:"event,attr"`
-		Date string `xml:",innerxml"`
+	Dates       []struct {
+		Event string `xml:"event,attr"`
+		Date  string `xml:",innerxml"`
 	} `xml:"metadata>date"`
 	Type     string `xml:"metadata>type"`
 	Format   string `xml:"metadata>format"`
@@ -262,6 +268,18 @@ func (r *Reader) setItems() error {
 	}
 
 	return nil
+}
+
+// DefaultRendition selects the default rendition from a list of rootfiles of
+// an epub container.
+func (c *Container) DefaultRendition() *Rootfile {
+	if len(c.Rootfiles) < 1 {
+		return nil
+	}
+
+	// An epub file may contain multilpe renditions. In practice, there is often
+	// just one. For simplicity, select the first available.
+	return c.Rootfiles[0]
 }
 
 // Open returns a ReadCloser that provides access to the Items's contents.
