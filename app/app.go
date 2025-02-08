@@ -15,7 +15,7 @@ type Application interface {
 
 	PageNavigator() nav.PageNavigator
 	Exit()
-	Run()
+	Run() int
 	Err() error
 }
 
@@ -31,17 +31,17 @@ type app struct {
 }
 
 // NewApp creates an App
-func NewApp(b *epub.Rootfile, p nav.PageNavigator) Application {
-	return &app{pager: p, book: b, exitSignal: make(chan bool, 1)}
+func NewApp(b *epub.Rootfile, p nav.PageNavigator, chapter int) Application {
+	return &app{pager: p, book: b, chapter: chapter, exitSignal: make(chan bool, 1)}
 }
 
 // Run opens a book, renders its contents within the pager, and polls for
 // terminal events until an error occurs or an exit event is detected.
-func (a *app) Run() {
+func (a *app) Run() int {
 	var screen tcell.Screen
 
 	if screen, a.err = initScreen(); a.err != nil {
-		return
+		return 0
 	}
 	defer screen.Fini()
 	a.pager.SetScreen(screen)
@@ -49,13 +49,13 @@ func (a *app) Run() {
 	keymap, chmap := initNavigationKeys(a)
 
 	if a.err = a.openChapter(); a.err != nil {
-		return
+		return 0
 	}
 
 	for {
 		select {
 		case <-a.exitSignal:
-			return
+			return a.chapter
 		default:
 		}
 

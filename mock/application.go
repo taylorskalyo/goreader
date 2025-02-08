@@ -44,6 +44,7 @@ func (a *MockApplication) Err() error {
 	return nil
 }
 
-func (a *MockApplication) Run() {
+func (a *MockApplication) Run() int {
 	a.Called()
+	return 0
 }
