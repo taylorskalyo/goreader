@@ -125,9 +125,9 @@ func (a *app) Exit() error {
 	return nil
 }
 
-// openChapter opens the given chapter and renders it within the pager.
-func (a *app) openChapter(chapter int) error {
-	if a.progress.Chapter > len(a.book().Spine.Itemrefs) || a.progress.Chapter < 0 {
+// GotoChapter opens the given chapter and renders it within the pager.
+func (a *app) GotoChapter(chapter int) error {
+	if chapter >= len(a.book().Spine.Itemrefs) || chapter < 0 {
 		// TODO: log warning
 		return nil
 	}
@@ -155,7 +155,7 @@ func (a *app) Forward() error {
 	}
 
 	// We reached the bottom.
-	if err := a.NextChapter(); err != nil {
+	if err := a.GotoChapter(a.progress.Chapter + 1); err != nil {
 		return err
 	}
 
@@ -169,36 +169,32 @@ func (a *app) Back() error {
 	}
 
 	// We reached the top.
-	if err := a.PrevChapter(); err != nil {
+	if err := a.GotoChapter(a.progress.Chapter - 1); err != nil {
 		return err
 	}
 
 	return a.pager.ToBottom()
 }
 
-// GotoChapter sets the current chapter and opens it.
-func (a *app) GotoChapter(chapter int) error {
-	if chapter > len(a.book().Spine.Itemrefs) || a.progress.Chapter < 0 {
-		return nil
-	}
-
-	if err := a.openChapter(chapter); err != nil {
+// nextChapter opens the next chapter.
+func (a *app) NextChapter() error {
+	if err := a.GotoChapter(a.progress.Chapter + 1); err != nil {
 		return err
 	}
 
 	return a.pager.ToTop()
 }
 
-// nextChapter opens the next chapter.
-func (a *app) NextChapter() error {
-	return a.GotoChapter(a.progress.Chapter + 1)
-}
-
 // prevChapter opens the previous chapter.
 func (a *app) PrevChapter() error {
-	return a.GotoChapter(a.progress.Chapter - 1)
+	if err := a.GotoChapter(a.progress.Chapter - 1); err != nil {
+		return err
+	}
+
+	return a.pager.ToTop()
 }
 
+// book selects and returns the rendition of the book to display.
 func (a app) book() *epub.Rootfile {
 	return a.bookRC.DefaultRendition()
 }
@@ -220,8 +216,8 @@ func (a app) bookID() string {
 
 // onStart is run when the application starts.
 func (a *app) onStart() error {
-	a.progress = state.Load(a.bookID())
-	if err := a.openChapter(a.progress.Chapter); err != nil {
+	a.progress = state.LoadProgress(a.bookID())
+	if err := a.GotoChapter(a.progress.Chapter); err != nil {
 		return err
 	}
 
@@ -235,5 +231,5 @@ func (a app) onExit() error {
 	a.progress.Position = a.pager.Position()
 	a.progress.Title = a.book().Title
 
-	return state.Store(a.bookID(), a.progress)
+	return state.StoreProgress(a.bookID(), a.progress)
 }

@@ -67,9 +67,6 @@ type Package struct {
 	Spine
 }
 
-type Identifier struct {
-}
-
 // Metadata contains publishing information about the epub.
 type Metadata struct {
 	Title      string `xml:"metadata>title"`
