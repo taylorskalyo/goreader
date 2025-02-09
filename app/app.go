@@ -11,16 +11,15 @@ import (
 )
 
 type Application interface {
-	Forward()
-	Back()
-	NextChapter()
-	PrevChapter()
+	Forward() error
+	Back() error
+	NextChapter() error
+	PrevChapter() error
 	GotoChapter(int) error
 
 	PageNavigator() nav.PageNavigator
-	Exit()
-	Run()
-	Err() error
+	Exit() error
+	Run() error
 }
 
 // app is used to store the current state of the application.
@@ -29,39 +28,33 @@ type app struct {
 	pager    nav.PageNavigator
 	progress state.Progress
 
-	err error
-
-	exitSignal chan bool
+	exitSignal bool
 }
 
 // NewApp creates an App
 func NewApp(rc *epub.ReadCloser, p nav.PageNavigator) Application {
-	return &app{pager: p, bookRC: rc, exitSignal: make(chan bool, 1)}
+	return &app{pager: p, bookRC: rc, exitSignal: false}
 }
 
 // Run opens a book, renders its contents within the pager, and polls for
 // terminal events until an error occurs or an exit event is detected.
-func (a *app) Run() {
-	var screen tcell.Screen
-
-	if screen, a.err = initScreen(); a.err != nil {
-		return
+func (a *app) Run() error {
+	screen, err := initScreen()
+	if err != nil {
+		return err
 	}
 	defer screen.Fini()
 	a.pager.SetScreen(screen)
 
 	keymap, chmap := initNavigationKeys(a)
 
-	if a.err = a.onStart(); a.err != nil {
-		return
+	if err = a.onStart(); err != nil {
+		return err
 	}
 
 	for {
-		select {
-		case <-a.exitSignal:
-			a.err = a.onExit()
-			return
-		default:
+		if a.exitSignal {
+			return a.onExit()
 		}
 
 		a.pager.Draw()
@@ -70,16 +63,15 @@ func (a *app) Run() {
 		switch ev := ev.(type) {
 		case *tcell.EventKey:
 			if action, ok := keymap[ev.Key()]; ok {
-				action()
+				err = action()
 			} else if action, ok := chmap[ev.Rune()]; ok {
-				action()
+				err = action()
+			}
+			if err != nil {
+				return err
 			}
 		}
 	}
-}
-
-func (a app) Err() error {
-	return a.err
 }
 
 func (a app) PageNavigator() nav.PageNavigator {
@@ -95,8 +87,8 @@ func initScreen() (tcell.Screen, error) {
 	return screen, err
 }
 
-func initNavigationKeys(a Application) (map[tcell.Key]func(), map[rune]func()) {
-	keymap := map[tcell.Key]func(){
+func initNavigationKeys(a Application) (map[tcell.Key]func() error, map[rune]func() error) {
+	keymap := map[tcell.Key]func() error{
 		// Pager
 		tcell.KeyDown:  a.PageNavigator().ScrollDown,
 		tcell.KeyUp:    a.PageNavigator().ScrollUp,
@@ -106,7 +98,7 @@ func initNavigationKeys(a Application) (map[tcell.Key]func(), map[rune]func()) {
 		// Navigation
 		tcell.KeyEsc: a.Exit,
 	}
-	chmap := map[rune]func(){
+	chmap := map[rune]func() error{
 		// PageNavigator
 		'j': a.PageNavigator().ScrollDown,
 		'k': a.PageNavigator().ScrollUp,
@@ -127,22 +119,20 @@ func initNavigationKeys(a Application) (map[tcell.Key]func(), map[rune]func()) {
 }
 
 // Exit requests app termination.
-func (a *app) Exit() {
-	a.exitSignal <- true
+func (a *app) Exit() error {
+	a.exitSignal = true
+
+	return nil
 }
 
-// GotoChapter sets the current chapter and opens it.
-func (a *app) GotoChapter(chapter int) error {
-	a.progress.Chapter = chapter
-	return a.openChapter()
-}
-
-// openChapter opens the current chapter and renders it within the pager.
-func (a *app) openChapter() error {
+// openChapter opens the given chapter and renders it within the pager.
+func (a *app) openChapter(chapter int) error {
 	if a.progress.Chapter > len(a.book().Spine.Itemrefs) || a.progress.Chapter < 0 {
 		// TODO: log warning
-		a.progress.Chapter = 0
+		return nil
 	}
+
+	a.progress.Chapter = chapter
 
 	f, err := a.book().Spine.Itemrefs[a.progress.Chapter].Open()
 	if err != nil {
@@ -159,51 +149,54 @@ func (a *app) openChapter() error {
 }
 
 // Forward pages down or opens the next chapter.
-func (a *app) Forward() {
+func (a *app) Forward() error {
 	if a.pager.PageDown() || a.progress.Chapter >= len(a.book().Spine.Itemrefs)-1 {
-		return
+		return nil
 	}
 
 	// We reached the bottom.
-	if a.NextChapter(); a.err == nil {
-		a.pager.ToTop()
+	if err := a.NextChapter(); err != nil {
+		return err
 	}
+
+	return a.pager.ToTop()
 }
 
 // Back pages up or opens the previous chapter.
-func (a *app) Back() {
+func (a *app) Back() error {
 	if a.pager.PageUp() || a.progress.Chapter <= 0 {
-		return
+		return nil
 	}
 
 	// We reached the top.
-	if a.PrevChapter(); a.err == nil {
-		a.pager.ToBottom()
+	if err := a.PrevChapter(); err != nil {
+		return err
 	}
+
+	return a.pager.ToBottom()
+}
+
+// GotoChapter sets the current chapter and opens it.
+func (a *app) GotoChapter(chapter int) error {
+	if chapter > len(a.book().Spine.Itemrefs) || a.progress.Chapter < 0 {
+		return nil
+	}
+
+	if err := a.openChapter(chapter); err != nil {
+		return err
+	}
+
+	return a.pager.ToTop()
 }
 
 // nextChapter opens the next chapter.
-func (a *app) NextChapter() {
-	if a.progress.Chapter >= len(a.book().Spine.Itemrefs)-1 {
-		return
-	}
-
-	a.progress.Chapter++
-	if a.err = a.openChapter(); a.err == nil {
-		a.pager.ToTop()
-	}
+func (a *app) NextChapter() error {
+	return a.GotoChapter(a.progress.Chapter + 1)
 }
 
 // prevChapter opens the previous chapter.
-func (a *app) PrevChapter() {
-	if a.progress.Chapter <= 0 {
-		return
-	}
-
-	a.progress.Chapter--
-	if a.err = a.openChapter(); a.err == nil {
-		a.pager.ToTop()
-	}
+func (a *app) PrevChapter() error {
+	return a.GotoChapter(a.progress.Chapter - 1)
 }
 
 func (a app) book() *epub.Rootfile {
@@ -228,7 +221,7 @@ func (a app) bookID() string {
 // onStart is run when the application starts.
 func (a *app) onStart() error {
 	a.progress = state.Load(a.bookID())
-	if err := a.openChapter(); err != nil {
+	if err := a.openChapter(a.progress.Chapter); err != nil {
 		return err
 	}
 

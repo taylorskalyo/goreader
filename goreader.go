@@ -36,10 +36,8 @@ func main() {
 	defer rc.Close()
 
 	a := app.NewApp(rc, new(nav.Pager))
-	a.Run()
-
-	if a.Err() != nil {
-		fmt.Fprintf(os.Stderr, "Exit with error: %s\n", a.Err().Error())
+	if err = a.Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "Exit with error: %s\n", err.Error())
 		os.Exit(1)
 	}
 

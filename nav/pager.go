@@ -12,15 +12,15 @@ type PageNavigator interface {
 	PageDown() bool
 	PageUp() bool
 	Pages() int
-	ScrollDown()
-	ScrollLeft()
-	ScrollRight()
-	ScrollUp()
+	ScrollDown() error
+	ScrollLeft() error
+	ScrollRight() error
+	ScrollUp() error
 	SetDoc(parse.Cellbuf)
 	SetScreen(tcell.Screen)
 	Size() (int, int)
-	ToBottom()
-	ToTop()
+	ToBottom() error
+	ToTop() error
 	Position() float64
 	SetPosition(float64)
 }
@@ -72,34 +72,42 @@ func (p *Pager) Draw() {
 
 // scrollDown pans the pager's viewport down, without exceeding the underlying
 // cell buffer document's boundaries.
-func (p *Pager) ScrollDown() {
+func (p *Pager) ScrollDown() error {
 	if p.scrollY < p.MaxScrollY() {
 		p.scrollY++
 	}
+
+	return nil
 }
 
 // scrollUp pans the pager's viewport up, without exceeding the underlying cell
 // buffer document's boundaries.
-func (p *Pager) ScrollUp() {
+func (p *Pager) ScrollUp() error {
 	if p.scrollY > 0 {
 		p.scrollY--
 	}
+
+	return nil
 }
 
 // scrollLeft pans the pager's viewport left, without exceeding the underlying
 // cell buffer document's boundaries.
-func (p *Pager) ScrollLeft() {
+func (p *Pager) ScrollLeft() error {
 	if p.scrollX < 0 {
 		p.scrollX++
 	}
+
+	return nil
 }
 
 // scrollRight pans the pager's viewport right, without exceeding the
 // underlying cell buffer document's boundaries.
-func (p *Pager) ScrollRight() {
+func (p *Pager) ScrollRight() error {
 	if p.scrollX > -p.MaxScrollX() {
 		p.scrollX--
 	}
+
+	return nil
 }
 
 // pageDown pans the pager's viewport down by a full page, without exceeding
@@ -131,23 +139,28 @@ func (p *Pager) PageUp() bool {
 
 // toTop set's the pager's horizontal and vertical panning distance back to
 // zero.
-func (p *Pager) ToTop() {
+func (p *Pager) ToTop() error {
 	p.scrollX = 0
 	p.scrollY = 0
+
+	return nil
 }
 
 // toBottom set's the pager's horizontal panning distance back to zero and
 // vertical panning distance to the last viewport page.
-func (p *Pager) ToBottom() {
+func (p *Pager) ToBottom() error {
 	_, viewHeight := p.screen.Size()
 	p.scrollX = 0
 	p.scrollY = p.Pages() * viewHeight
+
+	return nil
 }
 
 // maxScrollX represents the pager's maximum horizontal scroll distance.
 func (p Pager) MaxScrollX() int {
 	docWidth, _ := p.Size()
 	viewWidth, _ := p.screen.Size()
+
 	return docWidth - viewWidth
 }
 
@@ -155,6 +168,7 @@ func (p Pager) MaxScrollX() int {
 func (p Pager) MaxScrollY() int {
 	_, docHeight := p.Size()
 	_, viewHeight := p.screen.Size()
+
 	return docHeight - viewHeight
 }
 
@@ -162,6 +176,7 @@ func (p Pager) MaxScrollY() int {
 // document.
 func (p Pager) Size() (int, int) {
 	height := len(p.doc.Cells) / p.doc.Width
+
 	return p.doc.Width, height
 }
 
@@ -170,6 +185,7 @@ func (p Pager) Size() (int, int) {
 func (p Pager) Pages() int {
 	_, docHeight := p.Size()
 	_, viewHeight := p.screen.Size()
+
 	return docHeight / viewHeight
 }
 
@@ -177,6 +193,7 @@ func (p Pager) Pages() int {
 // percentage.
 func (p Pager) Position() float64 {
 	_, docHeight := p.Size()
+
 	return float64(p.scrollY) / float64(docHeight)
 }
 

@@ -36,20 +36,28 @@ func (p *MockPageNavigator) Pages() int {
 	panic("not implemented") // TODO: Implement
 }
 
-func (p *MockPageNavigator) ScrollDown() {
+func (p *MockPageNavigator) ScrollDown() error {
 	p.Called()
+
+	return nil
 }
 
-func (p *MockPageNavigator) ScrollLeft() {
+func (p *MockPageNavigator) ScrollLeft() error {
 	p.Called()
+
+	return nil
 }
 
-func (p *MockPageNavigator) ScrollRight() {
+func (p *MockPageNavigator) ScrollRight() error {
 	p.Called()
+
+	return nil
 }
 
-func (p *MockPageNavigator) ScrollUp() {
+func (p *MockPageNavigator) ScrollUp() error {
 	p.Called()
+
+	return nil
 }
 
 func (p *MockPageNavigator) SetDoc(_ parse.Cellbuf) {
@@ -64,10 +72,24 @@ func (p *MockPageNavigator) Size() (int, int) {
 	panic("not implemented") // TODO: Implement
 }
 
-func (p *MockPageNavigator) ToBottom() {
+func (p *MockPageNavigator) ToBottom() error {
 	p.Called()
+
+	return nil
 }
 
-func (p *MockPageNavigator) ToTop() {
+func (p *MockPageNavigator) ToTop() error {
+	p.Called()
+
+	return nil
+}
+
+func (p *MockPageNavigator) Position() float64 {
+	p.Called()
+
+	return 0
+}
+
+func (p *MockPageNavigator) SetPosition(float64) {
 	p.Called()
 }

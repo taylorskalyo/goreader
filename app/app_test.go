@@ -22,13 +22,17 @@ func TestInitNavigationKeys(t *testing.T) {
 		switch v := input.(type) {
 		case rune:
 			if fn, ok := chmap[v]; ok {
-				fn()
+				if err := fn(); err != nil {
+					t.Fatal(err)
+				}
 			} else {
 				t.Errorf("unhandled input character: %c", v)
 			}
 		case tcell.Key:
 			if fn, ok := keymap[v]; ok {
-				fn()
+				if err := fn(); err != nil {
+					t.Fatal(err)
+				}
 			} else {
 				t.Errorf("unhandled input key: %#x", input)
 			}

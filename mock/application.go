@@ -19,32 +19,44 @@ func (a *MockApplication) PageNavigator() nav.PageNavigator {
 	return a.pager
 }
 
-func (a *MockApplication) Exit() {
+func (a *MockApplication) Exit() error {
 	a.Called()
-}
 
-func (a *MockApplication) Forward() {
-	a.Called()
-}
-
-func (a *MockApplication) Back() {
-	a.Called()
-}
-
-func (a *MockApplication) NextChapter() {
-	a.Called()
-}
-
-func (a *MockApplication) PrevChapter() {
-	a.Called()
-}
-
-func (a *MockApplication) Err() error {
-	a.Called()
 	return nil
 }
 
-func (a *MockApplication) Run() int {
+func (a *MockApplication) Forward() error {
 	a.Called()
-	return 0
+
+	return nil
+}
+
+func (a *MockApplication) Back() error {
+	a.Called()
+
+	return nil
+}
+
+func (a *MockApplication) GotoChapter(int) error {
+	a.Called()
+
+	return nil
+}
+
+func (a *MockApplication) NextChapter() error {
+	a.Called()
+
+	return nil
+}
+
+func (a *MockApplication) PrevChapter() error {
+	a.Called()
+
+	return nil
+}
+
+func (a *MockApplication) Run() error {
+	a.Called()
+
+	return nil
 }
