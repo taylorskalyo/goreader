@@ -15,10 +15,11 @@ import (
 )
 
 var (
-	ErrNoExitAction = errors.New("Exit action not configured")
-	ErrNoArgs       = errors.New("missing arguments")
+	// ErrUsage is returned when the application is used in unexpected ways.
+	ErrUsage = errors.New("exit with error")
 )
 
+// Application represents the application view.
 type Application struct {
 	*tview.Application
 
@@ -37,6 +38,7 @@ type Application struct {
 	container *tview.Flex
 }
 
+// NewApplication returns an empty application.
 func NewApplication() *Application {
 	app := &Application{
 		Application: tview.NewApplication(),
@@ -77,13 +79,19 @@ func NewApplication() *Application {
 	return app
 }
 
+// Run wraps tview.Application.Run(). It handles configuration, processes
+// arguments, and then starts polling for events.
 func (app *Application) Run() error {
-	if len(os.Args) <= 1 {
-		return ErrNoArgs
-	}
-
 	if err := app.configure(); err != nil {
 		return err
+	}
+
+	if len(os.Args) <= 1 {
+		app.printUsage()
+		return ErrUsage
+	} else if os.Args[1] == "-h" {
+		app.printHelp()
+		return nil
 	}
 
 	rc, err := epub.OpenReader(os.Args[1])
@@ -97,14 +105,26 @@ func (app *Application) Run() error {
 	app.renderer.SetTheme(app.config.Theme)
 	app.footer.SetText(app.book.Title)
 
+	app.loadProgress()
 	go app.QueueUpdate(func() {
-		app.loadProgress()
 		app.gotoChapter(app.progress.Chapter)
 		app.setPosition(app.progress.Position)
 		app.updateHeader()
 	})
 
 	return app.Application.Run()
+}
+
+// printHelp prints the configured keybindings to stderr.
+func (app Application) printHelp() {
+	fmt.Fprintf(os.Stderr, "Configured keybindings:\n\n%s\n", app.config.Keybindings)
+}
+
+// printUsage prints application usage to stderr.
+func (app Application) printUsage() {
+	fmt.Fprintln(os.Stderr, "Usage: goreader [epub file]")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "-h             print keybindings")
 }
 
 func (app *Application) Stop() {
@@ -125,21 +145,24 @@ func (app *Application) configure() error {
 		app.warn("Using default config.")
 	}
 
-	// Refuse to run if there's no exit action configured.
-	hasExit := false
-	for _, action := range app.config.Keybindings {
-		if action == config.ActionExit {
-			hasExit = true
-			break
-		}
-	}
-
-	if !hasExit {
-		app.warn(fmt.Sprintf("Make sure you configure a keybinding for the Exit action in %s", config.ConfigFile))
-		return ErrNoExitAction
+	// Rather than running with no way to stop, exit with an error when Exit
+	// action is not configured.
+	if !app.hasAction(config.ActionExit) {
+		app.warn(fmt.Sprintf("No keybinding for Exit action. Edit %s to add keybinding for Exit action.", config.ConfigFile))
+		return errors.New("Exit action not configured")
 	}
 
 	return nil
+}
+
+func (app Application) hasAction(target config.Action) bool {
+	for _, action := range app.config.Keybindings {
+		if action == target {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (app *Application) loadProgress() {

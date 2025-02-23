@@ -11,7 +11,12 @@ import (
 func main() {
 	app := views.NewApplication()
 	if err := app.Run(); err != nil {
-		slog.Error("Encountered fatal error.", "error", err)
+		if err != views.ErrUsage {
+
+			// Assume non-usage errors are fatal.
+			slog.Error("Encountered fatal error.", "error", err)
+		}
+
 		os.Exit(1)
 	}
 

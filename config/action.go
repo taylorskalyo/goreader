@@ -4,33 +4,33 @@ import "fmt"
 
 const (
 	ActionExit Action = iota
-	ActionDown
 	ActionUp
+	ActionDown
 	ActionLeft
 	ActionRight
 	ActionTop
 	ActionBottom
-	ActionForward
 	ActionBackward
-	ActionChapterNext
+	ActionForward
 	ActionChapterPrevious
+	ActionChapterNext
 )
 
 var (
 	// ActionNames holds the written names of callable events. Useful to echo back
 	// an event name, or to look up an event from a string value.
 	ActionNames = map[Action]string{
-		ActionExit:            "Exit",
-		ActionDown:            "Down",
 		ActionUp:              "Up",
+		ActionDown:            "Down",
 		ActionLeft:            "Left",
 		ActionRight:           "Right",
 		ActionTop:             "Top",
 		ActionBottom:          "Botom",
-		ActionForward:         "Forward",
 		ActionBackward:        "Backward",
-		ActionChapterNext:     "ChapterNext",
+		ActionForward:         "Forward",
 		ActionChapterPrevious: "ChapterPrevious",
+		ActionChapterNext:     "ChapterNext",
+		ActionExit:            "Exit",
 	}
 
 	namedActions = map[string]Action{}

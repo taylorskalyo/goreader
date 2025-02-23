@@ -1,12 +1,15 @@
 package config
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/adrg/xdg"
 	"github.com/gdamore/tcell/v2"
+	"github.com/jedib0t/go-pretty/v6/table"
 	"golang.org/x/net/html/atom"
 	"gopkg.in/yaml.v3"
 )
@@ -81,8 +84,60 @@ func (s Style) String() string {
 	return b.String()
 }
 
-// Keybindings map key presses to actions.
+// Keybindings maps key presses to actions.
 type Keybindings map[KeyChord]Action
+
+func (k Keybindings) lookup(target Action) []KeyChord {
+	chords := []KeyChord{}
+	for chord, action := range k {
+		if action == target {
+			chords = append(chords, chord)
+		}
+	}
+
+	return chords
+}
+
+// String pretty-prints keybindings in a tabular format.
+func (k Keybindings) String() string {
+	var b bytes.Buffer
+
+	t := table.NewWriter()
+	t.SetOutputMirror(&b)
+	t.AppendHeader(table.Row{"Action", "Key"})
+
+	actions := []Action{}
+	for action := range ActionNames {
+		actions = append(actions, action)
+	}
+	sort.Slice(actions, func(i, j int) bool {
+		return actions[i] < actions[j]
+	})
+
+	for _, action := range actions {
+		name := ActionNames[action]
+		chords := k.lookup(action)
+		chordStrs := make([]string, len(chords))
+		for i, chord := range chords {
+			chordStrs[i] = chord.String()
+		}
+		sort.Slice(chordStrs, func(i, j int) bool {
+			return len(chordStrs[i]) < len(chordStrs[j])
+		})
+
+		t.AppendRows([]table.Row{
+			{name, strings.Join(chordStrs, " / ")},
+		})
+	}
+
+	style := table.StyleDefault
+	style.Options.DrawBorder = false
+	style.Options.SeparateColumns = false
+	t.SetStyle(style)
+	t.Render()
+
+	return b.String()
+}
 
 // Default is the default configuration.
 func Default() Config {

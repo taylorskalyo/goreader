@@ -59,7 +59,7 @@ func (kc KeyChord) Event() *tcell.EventKey {
 // UnmarshalText creates a new KeyChord from text. In it's textual form, a
 // KeyChord uses the following format:
 //
-//	[modifiers... +] [key | rune]
+// [modifiers... +] [key | rune]
 //
 // Modifier and key names are case-insensitive. There can be any number of
 // supported modifiers, and there must be exactly one key or rune. A "+"
@@ -67,9 +67,9 @@ func (kc KeyChord) Event() *tcell.EventKey {
 //
 // For example:
 //
-//	CTRL + ALT + SPACE
-//	Meta + x
-//	esc
+// CTRL + ALT + SPACE
+// Meta + x
+// esc
 func (kc *KeyChord) UnmarshalText(text []byte) error {
 	*kc = KeyChord{}
 	keys := strings.Split(string(text), "+")
@@ -98,6 +98,11 @@ func (kc *KeyChord) UnmarshalText(text []byte) error {
 
 // MarshalText renders a KeyChord as text.
 func (kc KeyChord) MarshalText() ([]byte, error) {
+	return []byte(kc.String()), nil
+}
+
+// String renders a KeyChord as text.
+func (kc KeyChord) String() string {
 	keys := kc.modNames()
 	if kc.Key == tcell.KeyRune {
 		keys = append(keys, string(kc.Rune))
@@ -105,7 +110,7 @@ func (kc KeyChord) MarshalText() ([]byte, error) {
 		keys = append(keys, tcell.KeyNames[kc.Key])
 	}
 
-	return []byte(strings.Join(keys, "+")), nil
+	return strings.Join(keys, "+")
 }
 
 func (kc KeyChord) modNames() []string {

@@ -120,6 +120,7 @@ func (app *Application) gotoChapter(n int) {
 
 	app.text.SetText("")
 	app.progress.Chapter = n
+
 	err := app.renderer.RenderChapter(context.TODO(), n, app.text)
 	if err != nil {
 		app.error("load chapter", err)
