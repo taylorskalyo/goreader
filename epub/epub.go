@@ -172,10 +172,12 @@ func (r *Reader) init(z *zip.Reader) error {
 	if err != nil {
 		return err
 	}
+
 	err = r.setPackages()
 	if err != nil {
 		return err
 	}
+
 	err = r.setItems()
 	if err != nil {
 		return err

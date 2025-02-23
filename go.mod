@@ -6,9 +6,11 @@ require (
 	github.com/adrg/xdg v0.5.3
 	github.com/gdamore/tcell/v2 v2.8.1
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
+	github.com/rivo/tview v0.0.0-20241227133733-17b7edb88c57
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/mod v0.17.0
 	golang.org/x/net v0.34.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -22,5 +24,4 @@ require (
 	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/term v0.29.0 // indirect
 	golang.org/x/text v0.22.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
