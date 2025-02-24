@@ -27,7 +27,7 @@ type Application struct {
 	actions actions
 
 	progress state.Progress
-	book     epub.Package
+	book     *epub.Rootfile
 
 	linecount int
 	renderer  render.Renderer
@@ -100,8 +100,8 @@ func (app *Application) Run() error {
 	}
 	defer rc.Close()
 
-	app.book = rc.DefaultRendition().Package
-	app.renderer = render.New(&app.book)
+	app.book = rc.DefaultRendition()
+	app.renderer = render.New(&app.book.Package)
 	app.renderer.SetTheme(app.config.Theme)
 	app.footer.SetText(app.book.Title)
 
@@ -204,7 +204,13 @@ func (app *Application) updateHeader() {
 	pages := (height + app.linecount - 1) / height
 	cur := int(float64(r)/float64(height)+0.5) + 1 // closest page relative to offset
 
-	app.header.SetText(fmt.Sprintf("CHAPTER %d - %d OF %d", app.progress.Chapter+1, cur, pages))
+	// Try to find chapter title.
+	ref := app.book.Spine.Itemrefs[app.progress.Chapter]
+	if title := app.book.ItemName(ref.HREF); title != "" {
+		app.header.SetText(fmt.Sprintf("%s • %d OF %d", title, cur, pages))
+	} else {
+		app.header.SetText(fmt.Sprintf("%d OF %d", cur, pages))
+	}
 }
 
 // inputHandler intercepts input events. If the application has an action
