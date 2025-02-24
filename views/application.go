@@ -127,6 +127,7 @@ func (app Application) printUsage() {
 	fmt.Fprintln(os.Stderr, "-h             print keybindings")
 }
 
+// Stop wraps tview.Application.Stop(). It causes Run() to return.
 func (app *Application) Stop() {
 	app.progress.Position = app.getPosition()
 	app.progress.Title = app.book.Title
@@ -138,6 +139,8 @@ func (app *Application) Stop() {
 	app.Application.Stop()
 }
 
+// configure loads the application configuration from a file. If the file does
+// not exist or an error occurs, the default configuration will be used.
 func (app *Application) configure() error {
 	var err error
 	if app.config, err = config.Load(); err != nil {
@@ -155,6 +158,7 @@ func (app *Application) configure() error {
 	return nil
 }
 
+// hasAction checks to see if the application has an action configured.
 func (app Application) hasAction(target config.Action) bool {
 	for _, action := range app.config.Keybindings {
 		if action == target {
@@ -165,6 +169,7 @@ func (app Application) hasAction(target config.Action) bool {
 	return false
 }
 
+// loadProgress loads the reading progress for the currently opened book.
 func (app *Application) loadProgress() {
 	var err error
 	app.progress, err = state.LoadProgress(app.bookID())
@@ -174,16 +179,19 @@ func (app *Application) loadProgress() {
 	}
 }
 
+// setPosition seeks to a given position within the open chapter.
 func (app *Application) setPosition(pos float64) {
 	app.text.ScrollTo(int(pos*float64(app.linecount)), 0)
 }
 
+// getPosition returns the position within the open chapter.
 func (app *Application) getPosition() float64 {
 	r, _ := app.text.GetScrollOffset()
 
 	return float64(r) / float64(app.linecount)
 }
 
+// updateHeader populates the application's header window.
 func (app *Application) updateHeader() {
 	r, _ := app.text.GetScrollOffset()
 	if r < 1 {
@@ -199,6 +207,8 @@ func (app *Application) updateHeader() {
 	app.header.SetText(fmt.Sprintf("CHAPTER %d - %d OF %d", app.progress.Chapter+1, cur, pages))
 }
 
+// inputHandler intercepts input events. If the application has an action
+// configured for an event, it will be triggered here.
 func (app *Application) inputHandler(event *tcell.EventKey) *tcell.EventKey {
 	if event == nil {
 		return nil
@@ -215,12 +225,15 @@ func (app *Application) inputHandler(event *tcell.EventKey) *tcell.EventKey {
 	return nil
 }
 
+// warn suspends the application and then writes warning messages to stderr.
 func (app Application) warn(msg string, args ...any) {
 	app.suspend(func() {
 		slog.Warn(msg, args...)
 	})
 }
 
+// error suspends the application and then writes error messages to stderr.
+// Callers must supply an error message.
 func (app Application) error(msg string, err error, args ...any) {
 	args = append(args, "error", err)
 	app.suspend(func() {
@@ -228,6 +241,9 @@ func (app Application) error(msg string, err error, args ...any) {
 	})
 }
 
+// suspend calls tview.Application.Suspend() with the given function. Unlike
+// tview.Application.Suspend(), the function will still be invoked if the
+// application is already suspended.
 func (app Application) suspend(fn func()) {
 	if !app.Suspend(fn) {
 		fn()

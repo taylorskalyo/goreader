@@ -27,8 +27,9 @@ type Progress struct {
 	Position float64
 }
 
+// State represents the entire state file.
 type State struct {
-	// Library is a collection of reading states.
+	// Library is a collection of reading progress states.
 	Library map[string]Progress
 }
 
@@ -38,7 +39,7 @@ func newState() State {
 	}
 }
 
-// LoadProgress opens the statefile in $XDG_STATE_HOME and looks for the gievn
+// LoadProgress opens the state file in $XDG_STATE_HOME and looks for the given
 // book identifier. If not present, or if an error occurs, it returns an empty
 // state.
 func LoadProgress(id string) (Progress, error) {
@@ -52,7 +53,7 @@ func LoadProgress(id string) (Progress, error) {
 	return Progress{}, err
 }
 
-// loadState will open a statefile.
+// loadState will open a state file.
 func loadState() (State, error) {
 	state := newState()
 	data, err := os.ReadFile(stateFile)

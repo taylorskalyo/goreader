@@ -21,6 +21,7 @@ import (
 	"golang.org/x/net/html/atom"
 )
 
+// Renderer is responsible for rendering epub content.
 type Renderer struct {
 	content *epub.Package
 	theme   config.Theme
@@ -28,6 +29,7 @@ type Renderer struct {
 	parser  parser
 }
 
+// parser represents the current parsing state.
 type parser struct {
 	tagStack  []atom.Atom
 	tokenizer *html.Tokenizer
@@ -36,6 +38,7 @@ type parser struct {
 	writer    *wordWrapWriter
 }
 
+// New returns a new epub Renderer.
 func New(content *epub.Package) Renderer {
 	return Renderer{
 		content: content,
@@ -44,10 +47,13 @@ func New(content *epub.Package) Renderer {
 	}
 }
 
+// SetTheme sets style options for a Renderer.
 func (r *Renderer) SetTheme(theme config.Theme) {
 	r.theme = theme
 }
 
+// RenderChapter reads in an epub item, parses the content, and writes the
+// rendered output to the given writer.
 func (r *Renderer) RenderChapter(ctx context.Context, chapter int, w io.Writer) error {
 	doc, err := r.content.Spine.Itemrefs[chapter].Open()
 	if err != nil {
@@ -62,7 +68,7 @@ func (r *Renderer) RenderChapter(ctx context.Context, chapter int, w io.Writer) 
 	return r.render(ctx)
 }
 
-// construct a tview style tag based on HTML tags in the tag stack.
+// tviewStyle constructs a tview style tag based on HTML tags in the tag stack.
 func (r Renderer) tviewStyle(tags []atom.Atom) string {
 	style := config.DefaultStyle()
 	for _, tag := range tags {
@@ -92,6 +98,7 @@ func (r *Renderer) render(ctx context.Context) error {
 	}
 }
 
+// handleToken is triggered when an HTML token is parsed.
 func (r *Renderer) handleToken() error {
 	tokenType := r.parser.tokenizer.Next()
 	token := r.parser.tokenizer.Token()
@@ -113,7 +120,7 @@ func (r *Renderer) handleToken() error {
 	return nil
 }
 
-// appendText appends text to the cell buffer document.
+// appendText appends text to the underlying writer.
 func (r *Renderer) appendText(text string) error {
 	if !hasText(text) {
 		return nil
@@ -150,7 +157,7 @@ func (r *Renderer) handleText(token html.Token) error {
 	return r.appendText(string(token.Data))
 }
 
-// ensure there are at least this many pending newlines.
+// ensureNewlines ensures that there are at least this many pending newlines.
 func (p *parser) ensureNewlines(n int) {
 	if p.newlines >= n {
 		return
@@ -159,8 +166,8 @@ func (p *parser) ensureNewlines(n int) {
 	p.newlines = n
 }
 
-// ensure there are at least this many pending indents.
-func (p *parser) ensureIndent(n int) {
+// ensureIndents ensure that there are at least this many pending indents.
+func (p *parser) ensureIndents(n int) {
 	if p.indents >= n {
 		return
 	}
@@ -168,8 +175,8 @@ func (p *parser) ensureIndent(n int) {
 	p.indents = n
 }
 
-// handleStartTag appends text representations of non-text elements (e.g. image alt
-// tags) to the parser buffer.
+// handleStartTag appends text representations of non-text elements (e.g. image
+// alt tags) to the parser buffer.
 func (r *Renderer) handleStartTag(token html.Token) (err error) {
 	switch token.DataAtom {
 	case atom.Img:
@@ -181,7 +188,7 @@ func (r *Renderer) handleStartTag(token html.Token) (err error) {
 		r.parser.ensureNewlines(2)
 	case atom.P:
 		r.parser.ensureNewlines(2)
-		r.parser.ensureIndent(2)
+		r.parser.ensureIndents(2)
 	case atom.Hr:
 		r.parser.ensureNewlines(2)
 		err = r.appendText(strings.Repeat("-", r.width))
@@ -192,7 +199,7 @@ func (r *Renderer) handleStartTag(token html.Token) (err error) {
 }
 
 // handleImage appends image elements to the parser buffer. It extracts alt
-// text and converts images to ascii art.
+// text and renders images.
 func (r *Renderer) handleImage(token html.Token) error {
 	for _, a := range token.Attr {
 		switch atom.Lookup([]byte(a.Key)) {
@@ -213,6 +220,7 @@ func (r *Renderer) handleImage(token html.Token) error {
 	return nil
 }
 
+// handleImageSrc reads a referenced image and renders it to the parser buffer.
 func (r *Renderer) handleImageSrc(href string) error {
 	for _, item := range r.content.Items {
 		if item.HREF == href {
@@ -230,6 +238,7 @@ func (r *Renderer) handleImageSrc(href string) error {
 	return nil
 }
 
+// imageToText renders an image as lines of text.
 func imageToText(item epub.Item, width int) []string {
 	lines := []string{}
 	r, err := item.Open()

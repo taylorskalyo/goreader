@@ -48,6 +48,7 @@ func (s Style) Merge(other Style) Style {
 	return s
 }
 
+// Strings renders a Style as a tview style tag.
 func (s Style) String() string {
 	var b strings.Builder
 	b.WriteString("[")
@@ -203,6 +204,7 @@ func DefaultTheme() Theme {
 	}
 }
 
+// DefaultStyle is the default style.
 func DefaultStyle() Style {
 	return Style{
 		Foreground: pString("-"),

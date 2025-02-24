@@ -9,6 +9,7 @@ import (
 
 type actions map[config.Action]func()
 
+// initActions initializes configurable actions.
 func (app *Application) initActions() {
 	app.actions = actions{
 		config.ActionExit:            app.Stop,
@@ -32,28 +33,36 @@ func (app *Application) initActions() {
 	}
 }
 
+// Up scrolls the application viewport up by one line.
 func (app *Application) Up() {
 	r, c := app.text.GetScrollOffset()
 	app.text.ScrollTo(r-1, c)
 	app.updateHeader()
 }
 
+// Down scrolls the application viewport down by one line.
 func (app *Application) Down() {
 	r, c := app.text.GetScrollOffset()
 	app.text.ScrollTo(r+1, c)
 	app.updateHeader()
 }
 
+// Left scrolls the application viewport left by one character.
+// TODO: deprecate.
 func (app *Application) Left() {
 	r, c := app.text.GetScrollOffset()
 	app.text.ScrollTo(r, c-1)
 }
 
+// Right scrolls the application viewport right by one character.
+// TODO: deprecate.
 func (app *Application) Right() {
 	r, c := app.text.GetScrollOffset()
 	app.text.ScrollTo(r, c+1)
 }
 
+// Backward navigates backward by a page within the viewport. If at the top of
+// a chapter, the viewport will navigate to the bottom of the previous chapter.
 func (app *Application) Backward() {
 	_, _, _, height := app.text.GetRect()
 	r, c := app.text.GetScrollOffset()
@@ -71,6 +80,8 @@ func (app *Application) Backward() {
 	app.updateHeader()
 }
 
+// Forward navigates forward by a page within the viewport. If at the bottom of
+// a chapter, the viewport will navigate to the top of the next chapter.
 func (app *Application) Forward() {
 	_, _, _, height := app.text.GetRect()
 	r, c := app.text.GetScrollOffset()
@@ -89,29 +100,34 @@ func (app *Application) Forward() {
 	app.updateHeader()
 }
 
+// Bottom navigates to the bottom of the current chapter.
 func (app *Application) Bottom() {
 	_, _, _, height := app.text.GetRect()
 	app.text.ScrollTo(app.linecount-height, 0)
 	app.updateHeader()
 }
 
+// Top navigates to the top of the current chapter.
 func (app *Application) Top() {
 	app.text.ScrollToBeginning()
 	app.updateHeader()
 }
 
+// ChapterNext navigates to the next chapter.
 func (app *Application) ChapterNext() {
 	app.gotoChapter(app.progress.Chapter + 1)
 	app.text.ScrollToBeginning()
 	app.updateHeader()
 }
 
+// ChapterPrevious navigates to the previous chapter.
 func (app *Application) ChapterPrevious() {
 	app.gotoChapter(app.progress.Chapter - 1)
 	app.text.ScrollToBeginning()
 	app.updateHeader()
 }
 
+// gotoChapter navigates to a specific chapter.
 func (app *Application) gotoChapter(n int) {
 	total := len(app.book.Spine.Itemrefs)
 	if n >= total || n < 0 {
