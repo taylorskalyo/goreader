@@ -54,3 +54,10 @@ func (w *wordWrapWriter) Flush() error {
 
 	return nil
 }
+
+// implements table.WidthEnforcer
+func tviewWidthEnforcer(text string, width int) string {
+	lines := tview.WordWrap(text, width)
+
+	return strings.Join(lines, "\n")
+}

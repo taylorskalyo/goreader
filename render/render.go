@@ -12,6 +12,7 @@ import (
 	_ "image/jpeg"
 	_ "image/png"
 
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/nfnt/resize"
 	"github.com/rivo/tview"
 	"github.com/taylorskalyo/goreader/config"
@@ -20,6 +21,8 @@ import (
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
 )
+
+var tableStyle = table.StyleDefault
 
 // Renderer is responsible for rendering epub content.
 type Renderer struct {
@@ -31,7 +34,11 @@ type Renderer struct {
 
 // parser represents the current parsing state.
 type parser struct {
-	tagStack  []atom.Atom
+	tagStack   []atom.Atom
+	tableStack []table.Writer
+	rowStack   [][]string
+	cellStack  []strings.Builder
+
 	tokenizer *html.Tokenizer
 	newlines  int
 	indents   int
@@ -115,6 +122,7 @@ func (r *Renderer) handleToken() error {
 	case html.EndTagToken:
 		r.parser.tagStack = r.parser.tagStack[:len(r.parser.tagStack)-1] // pop element
 		r.parser.indents = 0
+		return r.handleEndTag(token)
 	}
 
 	return nil
@@ -126,7 +134,6 @@ func (r *Renderer) appendText(text string) error {
 		return nil
 	}
 
-	text = processWhitespace(text)
 	text = tview.Escape(text)
 
 	pendingLines := strings.Repeat("\n", r.parser.newlines)
@@ -136,7 +143,7 @@ func (r *Renderer) appendText(text string) error {
 	r.parser.newlines = 0
 	r.parser.indents = 0
 
-	_, err := io.WriteString(r.parser.writer, text)
+	_, err := io.WriteString(r.parser.writeTarget(), text)
 
 	return err
 }
@@ -154,7 +161,8 @@ func (r *Renderer) handleText(token html.Token) error {
 		return err
 	}
 
-	return r.appendText(string(token.Data))
+	text := processWhitespace(token.Data)
+	return r.appendText(string(text))
 }
 
 // ensureNewlines ensures that there are at least this many pending newlines.
@@ -175,6 +183,15 @@ func (p *parser) ensureIndents(n int) {
 	p.indents = n
 }
 
+// determine if we are writing to a table or the main writer.
+func (p parser) writeTarget() io.Writer {
+	if len(p.cellStack) > 0 {
+		return &p.cellStack[len(p.cellStack)-1]
+	}
+
+	return p.writer
+}
+
 // handleStartTag appends text representations of non-text elements (e.g. image
 // alt tags) to the parser buffer.
 func (r *Renderer) handleStartTag(token html.Token) (err error) {
@@ -184,18 +201,165 @@ func (r *Renderer) handleStartTag(token html.Token) (err error) {
 	case atom.Br:
 		r.parser.newlines++
 	case atom.H1, atom.H2, atom.H3, atom.H4, atom.H5, atom.H6, atom.Title,
-		atom.Div, atom.Tr:
+		atom.Div:
 		r.parser.ensureNewlines(2)
 	case atom.P:
 		r.parser.ensureNewlines(2)
 		r.parser.ensureIndents(2)
 	case atom.Hr:
 		r.parser.ensureNewlines(2)
-		err = r.appendText(strings.Repeat("-", r.width))
+		err = r.appendText(strings.Repeat(tableStyle.Box.MiddleHorizontal, r.width))
 		r.parser.ensureNewlines(2)
+	case atom.Table:
+		t := table.NewWriter()
+		r.parser.tableStack = append(r.parser.tableStack, t) // push table
+	case atom.Th, atom.Td:
+		r.parser.cellStack = append(r.parser.cellStack, strings.Builder{}) // push cell writer
 	}
 
 	return err
+}
+
+// handleEndTag appends text that has been buffered until an element has been
+// fully parsed (e.g. tables).
+func (r *Renderer) handleEndTag(token html.Token) (err error) {
+	switch token.DataAtom {
+	case atom.Tr:
+		row := make([]string, len(r.parser.cellStack))
+		for i, cell := range r.parser.cellStack {
+			row[i] = strings.TrimSpace(cell.String())
+		}
+		r.parser.rowStack = append(r.parser.rowStack, row) // push row
+		r.parser.cellStack = []strings.Builder{}           // pop all cell writers
+	case atom.Table:
+		t := r.parser.tableStack[len(r.parser.tableStack)-1]
+		style := tableStyle
+		style.Size.WidthMax = r.width
+		style.Options.DrawBorder = true
+		style.Options.SeparateRows = true
+		style.Options.SeparateColumns = false
+
+		colConfigs := r.columnConfigs(style)
+		t.ImportGrid(r.parser.rowStack)
+		t.SetColumnConfigs(colConfigs)
+		t.SetStyle(style)
+		r.parser.rowStack = [][]string{}                                       // pop all rows
+		r.parser.tableStack = r.parser.tableStack[:len(r.parser.tableStack)-1] // pop table
+
+		if len(colConfigs) > 0 {
+			r.parser.ensureNewlines(2)
+			if err := r.appendText(t.Render()); err != nil {
+				return err
+			}
+			r.parser.ensureNewlines(2)
+		}
+	}
+
+	return err
+}
+
+// columnConfigs configures columns to fit within the viewport. It sets each
+// column's max width and handles text wrapping.
+func (r *Renderer) columnConfigs(style table.Style) (configs []table.ColumnConfig) {
+	columnCount := 0
+	for _, row := range r.parser.rowStack {
+		if len(row) > columnCount {
+			columnCount = len(row)
+		}
+	}
+
+	if columnCount < 1 {
+		return configs
+	}
+
+	configs = make([]table.ColumnConfig, columnCount)
+
+	// Determine width used up by table decorations.
+	decorationWidth := 2 * columnCount // padding
+	if style.Options.DrawBorder {
+		decorationWidth += 2
+	}
+	if style.Options.SeparateColumns {
+		decorationWidth += columnCount - 1
+	}
+
+	// Determine width availble for text.
+	availableWidth := r.width - decorationWidth
+	for i := range configs {
+		configs[i] = table.ColumnConfig{
+			Number:           i + 1,
+			WidthMaxEnforcer: tviewWidthEnforcer,
+		}
+	}
+
+	// Dynamically choose column width.
+	strategies := []func(int, *[]table.ColumnConfig) bool{
+		r.parser.tryFitColumn,
+		r.parser.tryFairColumn,
+	}
+	for _, fn := range strategies {
+		if ok := fn(availableWidth, &configs); ok {
+			return configs
+		}
+	}
+
+	return []table.ColumnConfig{}
+}
+
+// tryFitColumn fits each column width to its cell content. If the overall
+// width is greater than the available width, it will abort.
+func (p *parser) tryFitColumn(availableWidth int, configs *[]table.ColumnConfig) bool {
+	maxWidths := make([]int, len(*configs))
+	for _, row := range p.rowStack {
+		for col, cell := range row {
+			if len(cell) > maxWidths[col] {
+				maxWidths[col] = len(cell)
+			}
+		}
+	}
+
+	totalMaxWidth := 0
+	for _, width := range maxWidths {
+		totalMaxWidth += width
+	}
+
+	if totalMaxWidth > availableWidth {
+		return false
+	}
+
+	for i := range *configs {
+		(*configs)[i].WidthMax = maxWidths[i]
+	}
+
+	return true
+}
+
+// tryFairColumn gives each column a proportion of the available width with a
+// bias towards equal widths.
+func (p *parser) tryFairColumn(availableWidth int, configs *[]table.ColumnConfig) bool {
+	equalWidth := availableWidth / len(*configs)
+	fairWidths := make([]int, len(*configs))
+	for _, row := range p.rowStack {
+		for col, cell := range row {
+			fairWidth := (len(cell) + equalWidth) / 2
+			if fairWidth > fairWidths[col] {
+				fairWidths[col] = fairWidth
+			}
+		}
+	}
+
+	totalFairWidth := 0
+	for _, width := range fairWidths {
+		totalFairWidth += width
+	}
+
+	for i := range *configs {
+		ratio := float64(fairWidths[i]) / float64(totalFairWidth)
+		width := int(float64(availableWidth) * ratio)
+		(*configs)[i].WidthMax = width
+	}
+
+	return true
 }
 
 // handleImage appends image elements to the parser buffer. It extracts alt
@@ -222,6 +386,12 @@ func (r *Renderer) handleImage(token html.Token) error {
 
 // handleImageSrc reads a referenced image and renders it to the parser buffer.
 func (r *Renderer) handleImageSrc(href string) error {
+	if r.parser.writeTarget() != r.parser.writer {
+		// NOTE: rendering images inside tables is not supported at the moment as
+		// this would add a lot of complexity.
+		return nil
+	}
+
 	for _, item := range r.content.Items {
 		if item.HREF == href {
 			for _, line := range imageToText(item, r.width) {
