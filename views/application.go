@@ -51,7 +51,6 @@ func NewApplication() *Application {
 		SetChangedFunc(func() {
 			app.Draw()
 		})
-	app.text.SetBorderPadding(1, 1, 0, 0)
 	app.SetInputCapture(app.inputHandler)
 
 	app.header = tview.NewTextView().
@@ -64,14 +63,17 @@ func NewApplication() *Application {
 		SetWrap(false).
 		SetScrollable(false)
 
+	app.header.SetBorderPadding(0, 1, 0, 0)
+	app.footer.SetBorderPadding(1, 0, 0, 0)
+
 	app.container = tview.NewFlex().SetDirection(tview.FlexRow).
-		AddItem(app.header, 1, 0, false).
+		AddItem(app.header, 2, 0, false).
 		AddItem(app.text, 0, 1, true).
-		AddItem(app.footer, 1, 0, false)
+		AddItem(app.footer, 2, 0, false)
 
 	root := tview.NewFlex().
 		AddItem(nil, 0, 1, false).
-		AddItem(app.container, 80, 2, false).
+		AddItem(app.container, 80, 0, false).
 		AddItem(nil, 0, 1, false)
 
 	app.SetRoot(root, true).SetFocus(app.text).EnableMouse(true)
@@ -194,15 +196,18 @@ func (app *Application) getPosition() float64 {
 // updateHeader populates the application's header window.
 func (app *Application) updateHeader() {
 	r, _ := app.text.GetScrollOffset()
-	if r < 1 {
-		r = 1
-	} else if r > app.linecount {
-		r = app.linecount
+	_, _, _, height := app.text.GetRect()
+
+	// tview.TextView.Draw() keeps the vertical offset within these bounds.
+	// However, updateHeader gets called before tview.TextView.Draw().
+	if r < 0 {
+		r = 0
+	} else if r > app.linecount-height {
+		r = app.linecount - height
 	}
 
-	_, _, _, height := app.text.GetRect()
 	pages := (height + app.linecount - 1) / height
-	cur := int(float64(r)/float64(height)+0.5) + 1 // closest page relative to offset
+	cur := (height+r-1)/height + 1
 
 	// Try to find chapter title.
 	ref := app.book.Spine.Itemrefs[app.progress.Chapter]

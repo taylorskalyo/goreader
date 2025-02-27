@@ -36,15 +36,20 @@ func (app *Application) initActions() {
 // Up scrolls the application viewport up by one line.
 func (app *Application) Up() {
 	r, c := app.text.GetScrollOffset()
-	app.text.ScrollTo(r-1, c)
-	app.updateHeader()
+	if r > 0 {
+		app.text.ScrollTo(r-1, c)
+		app.updateHeader()
+	}
 }
 
 // Down scrolls the application viewport down by one line.
 func (app *Application) Down() {
 	r, c := app.text.GetScrollOffset()
-	app.text.ScrollTo(r+1, c)
-	app.updateHeader()
+	_, _, _, height := app.text.GetRect()
+	if r < app.linecount-height {
+		app.text.ScrollTo(r+1, c)
+		app.updateHeader()
+	}
 }
 
 // Left scrolls the application viewport left by one character.
@@ -66,6 +71,7 @@ func (app *Application) Right() {
 func (app *Application) Backward() {
 	_, _, _, height := app.text.GetRect()
 	r, c := app.text.GetScrollOffset()
+
 	if r > 0 {
 		app.text.ScrollTo(r-height, c)
 	} else {
@@ -85,7 +91,8 @@ func (app *Application) Backward() {
 func (app *Application) Forward() {
 	_, _, _, height := app.text.GetRect()
 	r, c := app.text.GetScrollOffset()
-	if r+height <= app.linecount {
+
+	if r < app.linecount-height {
 		app.text.ScrollTo(r+height, c)
 	} else {
 		// At bottom of page, go to next chapter
@@ -143,5 +150,5 @@ func (app *Application) gotoChapter(n int) {
 		return
 	}
 
-	app.linecount = app.text.GetWrappedLineCount()
+	app.linecount = app.text.GetOriginalLineCount()
 }
