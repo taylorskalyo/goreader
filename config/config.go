@@ -155,20 +155,16 @@ func Default() Config {
 // DefaultKeybindings is the default keybinding.
 func DefaultKeybindings() Keybindings {
 	return Keybindings{
-		KeyChord{Key: tcell.KeyDown}:  ActionDown,
-		KeyChord{Key: tcell.KeyUp}:    ActionUp,
-		KeyChord{Key: tcell.KeyLeft}:  ActionLeft,
-		KeyChord{Key: tcell.KeyRight}: ActionRight,
-		KeyChord{Key: tcell.KeyHome}:  ActionTop,
-		KeyChord{Key: tcell.KeyEnd}:   ActionBottom,
-		KeyChord{Key: tcell.KeyEsc}:   ActionExit,
-		KeyChord{Key: tcell.KeyPgDn}:  ActionForward,
-		KeyChord{Key: tcell.KeyPgUp}:  ActionBackward,
+		KeyChord{Key: tcell.KeyDown}: ActionDown,
+		KeyChord{Key: tcell.KeyUp}:   ActionUp,
+		KeyChord{Key: tcell.KeyHome}: ActionTop,
+		KeyChord{Key: tcell.KeyEnd}:  ActionBottom,
+		KeyChord{Key: tcell.KeyEsc}:  ActionExit,
+		KeyChord{Key: tcell.KeyPgDn}: ActionForward,
+		KeyChord{Key: tcell.KeyPgUp}: ActionBackward,
 
 		KeyChord{Key: tcell.KeyRune, Rune: 'j'}: ActionDown,
 		KeyChord{Key: tcell.KeyRune, Rune: 'k'}: ActionUp,
-		KeyChord{Key: tcell.KeyRune, Rune: 'h'}: ActionLeft,
-		KeyChord{Key: tcell.KeyRune, Rune: 'l'}: ActionRight,
 		KeyChord{Key: tcell.KeyRune, Rune: 'g'}: ActionTop,
 		KeyChord{Key: tcell.KeyRune, Rune: 'G'}: ActionBottom,
 		KeyChord{Key: tcell.KeyRune, Rune: 'q'}: ActionExit,

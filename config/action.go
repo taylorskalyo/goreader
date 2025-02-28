@@ -6,8 +6,6 @@ const (
 	ActionExit Action = iota
 	ActionUp
 	ActionDown
-	ActionLeft
-	ActionRight
 	ActionTop
 	ActionBottom
 	ActionBackward
@@ -22,8 +20,6 @@ var (
 	ActionNames = map[Action]string{
 		ActionUp:              "Up",
 		ActionDown:            "Down",
-		ActionLeft:            "Left",
-		ActionRight:           "Right",
 		ActionTop:             "Top",
 		ActionBottom:          "Botom",
 		ActionBackward:        "Backward",

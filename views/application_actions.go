@@ -15,8 +15,6 @@ func (app *Application) initActions() {
 		config.ActionExit:            app.Stop,
 		config.ActionUp:              app.Up,
 		config.ActionDown:            app.Down,
-		config.ActionLeft:            app.Left,
-		config.ActionRight:           app.Right,
 		config.ActionBackward:        app.Backward,
 		config.ActionForward:         app.Forward,
 		config.ActionTop:             app.Top,
@@ -48,20 +46,6 @@ func (app *Application) Down() {
 	if r < app.linecount-height {
 		app.text.ScrollTo(r+1, c)
 	}
-}
-
-// Left scrolls the application viewport left by one character.
-// TODO: deprecate.
-func (app *Application) Left() {
-	r, c := app.text.GetScrollOffset()
-	app.text.ScrollTo(r, c-1)
-}
-
-// Right scrolls the application viewport right by one character.
-// TODO: deprecate.
-func (app *Application) Right() {
-	r, c := app.text.GetScrollOffset()
-	app.text.ScrollTo(r, c+1)
 }
 
 // Backward navigates backward by a page within the viewport. If at the top of
