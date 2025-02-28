@@ -9,10 +9,14 @@ import (
 )
 
 var (
-	stateDir    = xdg.StateHome
-	appStateDir = filepath.Join(stateDir, "goreader")
-	stateFile   = filepath.Join(appStateDir, "progress.json")
+	stateDir    string
+	appStateDir string
+	stateFile   string
 )
+
+func init() {
+	ReloadEnv()
+}
 
 // Progress stores information about a book being read.
 type Progress struct {
@@ -85,4 +89,11 @@ func StoreProgress(id string, rs Progress) error {
 	}
 
 	return os.WriteFile(stateFile, data, 0644)
+}
+
+func ReloadEnv() {
+	xdg.Reload()
+	stateDir = xdg.StateHome
+	appStateDir = filepath.Join(stateDir, "goreader")
+	stateFile = filepath.Join(appStateDir, "progress.json")
 }

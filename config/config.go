@@ -15,9 +15,9 @@ import (
 )
 
 var (
-	configDir    = xdg.ConfigHome
-	appConfigDir = filepath.Join(configDir, "goreader")
-	ConfigFile   = filepath.Join(appConfigDir, "config.yml")
+	configDir    string
+	appConfigDir string
+	ConfigFile   string
 )
 
 type Theme map[string]Style
@@ -233,6 +233,13 @@ func Load() (*Config, error) {
 	err = yaml.Unmarshal(data, &config)
 
 	return &config, err
+}
+
+func ReloadEnv() {
+	xdg.Reload()
+	configDir = xdg.ConfigHome
+	appConfigDir = filepath.Join(configDir, "goreader")
+	ConfigFile = filepath.Join(appConfigDir, "config.yml")
 }
 
 func pBool(b bool) *bool {

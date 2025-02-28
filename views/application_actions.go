@@ -38,7 +38,6 @@ func (app *Application) Up() {
 	r, c := app.text.GetScrollOffset()
 	if r > 0 {
 		app.text.ScrollTo(r-1, c)
-		app.updateHeader()
 	}
 }
 
@@ -48,7 +47,6 @@ func (app *Application) Down() {
 	_, _, _, height := app.text.GetRect()
 	if r < app.linecount-height {
 		app.text.ScrollTo(r+1, c)
-		app.updateHeader()
 	}
 }
 
@@ -82,8 +80,6 @@ func (app *Application) Backward() {
 			app.text.ScrollTo(app.linecount-height, 0)
 		}
 	}
-
-	app.updateHeader()
 }
 
 // Forward navigates forward by a page within the viewport. If at the bottom of
@@ -103,35 +99,29 @@ func (app *Application) Forward() {
 			app.text.ScrollToBeginning()
 		}
 	}
-
-	app.updateHeader()
 }
 
 // Bottom navigates to the bottom of the current chapter.
 func (app *Application) Bottom() {
 	_, _, _, height := app.text.GetRect()
 	app.text.ScrollTo(app.linecount-height, 0)
-	app.updateHeader()
 }
 
 // Top navigates to the top of the current chapter.
 func (app *Application) Top() {
 	app.text.ScrollToBeginning()
-	app.updateHeader()
 }
 
 // ChapterNext navigates to the next chapter.
 func (app *Application) ChapterNext() {
 	app.gotoChapter(app.progress.Chapter + 1)
 	app.text.ScrollToBeginning()
-	app.updateHeader()
 }
 
 // ChapterPrevious navigates to the previous chapter.
 func (app *Application) ChapterPrevious() {
 	app.gotoChapter(app.progress.Chapter - 1)
 	app.text.ScrollToBeginning()
-	app.updateHeader()
 }
 
 // gotoChapter navigates to a specific chapter.

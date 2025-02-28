@@ -19,6 +19,25 @@ func TestDefault(t *testing.T) {
 	}
 }
 
+func TestStringifyKeybindings(t *testing.T) {
+	bindings := DefaultKeybindings()
+	expected := ` ACTION           KEY       
+----------------------------
+ Exit             q / Esc   
+ Up               k / Up    
+ Down             j / Down  
+ Left             h / Left  
+ Right            l / Right 
+ Top              g / Home  
+ Botom            G / End   
+ Backward         b / PgUp  
+ Forward          f / PgDn  
+ ChapterPrevious  H         
+ ChapterNext      L         
+`
+	assert.Equal(t, expected, bindings.String())
+}
+
 func TestUnmarshal(t *testing.T) {
 	testCases := []struct {
 		name     string

@@ -14,11 +14,6 @@ import (
 	"github.com/taylorskalyo/goreader/state"
 )
 
-var (
-	// ErrUsage is returned when the application is used in unexpected ways.
-	ErrUsage = errors.New("exit with error")
-)
-
 // Application represents the application view.
 type Application struct {
 	*tview.Application
@@ -45,6 +40,9 @@ func NewApplication() *Application {
 	}
 	app.initActions()
 
+	config := config.Default()
+	app.config = &config
+
 	app.text = tview.NewTextView().
 		SetDynamicColors(true).
 		SetWrap(false).
@@ -52,6 +50,7 @@ func NewApplication() *Application {
 			app.Draw()
 		})
 	app.SetInputCapture(app.inputHandler)
+	app.SetBeforeDrawFunc(app.beforeDraw)
 
 	app.header = tview.NewTextView().
 		SetTextAlign(tview.AlignCenter).
@@ -81,49 +80,29 @@ func NewApplication() *Application {
 	return app
 }
 
-// Run wraps tview.Application.Run(). It handles configuration, processes
-// arguments, and then starts polling for events.
-func (app *Application) Run() error {
-	if err := app.configure(); err != nil {
-		return err
-	}
-
-	if len(os.Args) <= 1 {
-		app.printUsage()
-		return ErrUsage
-	} else if os.Args[1] == "-h" {
-		app.printHelp()
-		return nil
-	}
-
-	rc, err := epub.OpenReader(os.Args[1])
-	if err != nil {
-		return err
-	}
-	defer rc.Close()
-
-	app.book = rc.DefaultRendition()
+func (app *Application) OpenBook(book *epub.Rootfile) {
+	app.book = book
 	app.renderer = render.New(&app.book.Package)
 	app.renderer.SetTheme(app.config.Theme)
 	app.footer.SetText(app.book.Title)
-
 	app.loadProgress()
-	go app.QueueUpdate(func() {
-		app.gotoChapter(app.progress.Chapter)
-		app.setPosition(app.progress.Position)
-		app.updateHeader()
-	})
+	app.gotoChapter(app.progress.Chapter)
+	app.setPosition(app.progress.Position)
+}
 
+// Run wraps tview.Application.Run(). It handles configuration, processes
+// arguments, and then starts polling for events.
+func (app *Application) Run() error {
 	return app.Application.Run()
 }
 
 // printHelp prints the configured keybindings to stderr.
-func (app Application) printHelp() {
+func (app Application) PrintHelp() {
 	fmt.Fprintf(os.Stderr, "Configured keybindings:\n\n%s\n", app.config.Keybindings)
 }
 
 // printUsage prints application usage to stderr.
-func (app Application) printUsage() {
+func (app Application) PrintUsage() {
 	fmt.Fprintln(os.Stderr, "Usage: goreader [epub file]")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "-h             print keybindings")
@@ -143,7 +122,7 @@ func (app *Application) Stop() {
 
 // configure loads the application configuration from a file. If the file does
 // not exist or an error occurs, the default configuration will be used.
-func (app *Application) configure() error {
+func (app *Application) Configure() error {
 	var err error
 	if app.config, err = config.Load(); err != nil {
 		app.error("load config", err)
@@ -191,6 +170,14 @@ func (app *Application) getPosition() float64 {
 	r, _ := app.text.GetScrollOffset()
 
 	return float64(r) / float64(app.linecount)
+}
+
+func (app *Application) beforeDraw(s tcell.Screen) bool {
+	if app.book != nil {
+		app.updateHeader()
+	}
+
+	return false
 }
 
 // updateHeader populates the application's header window.
