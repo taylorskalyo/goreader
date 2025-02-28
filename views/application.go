@@ -80,6 +80,9 @@ func NewApplication() *Application {
 	return app
 }
 
+// OpenBook loads the book contents into the application and navigates to the
+// last-open page. It loads the first page if the book has not previously been
+// read.
 func (app *Application) OpenBook(book *epub.Rootfile) {
 	app.book = book
 	app.renderer = render.New(&app.book.Package)
@@ -88,12 +91,6 @@ func (app *Application) OpenBook(book *epub.Rootfile) {
 	app.loadProgress()
 	app.gotoChapter(app.progress.Chapter)
 	app.setPosition(app.progress.Position)
-}
-
-// Run wraps tview.Application.Run(). It handles configuration, processes
-// arguments, and then starts polling for events.
-func (app *Application) Run() error {
-	return app.Application.Run()
 }
 
 // printHelp prints the configured keybindings to stderr.
@@ -108,7 +105,8 @@ func (app Application) PrintUsage() {
 	fmt.Fprintln(os.Stderr, "-h             print keybindings")
 }
 
-// Stop wraps tview.Application.Stop(). It causes Run() to return.
+// Stop wraps tview.Application.Stop(). It saves reading progress then causes
+// Run() to return.
 func (app *Application) Stop() {
 	app.progress.Position = app.getPosition()
 	app.progress.Title = app.book.Title
@@ -172,6 +170,7 @@ func (app *Application) getPosition() float64 {
 	return float64(r) / float64(app.linecount)
 }
 
+// beforeDraw is executed before every Draw() call of the application.
 func (app *Application) beforeDraw(s tcell.Screen) bool {
 	if app.book != nil {
 		app.updateHeader()
@@ -253,11 +252,12 @@ func (app Application) suspend(fn func()) {
 //
 // [1]: https://www.w3.org/TR/epub/#dfn-dc-identifier
 func (app Application) bookID() string {
-	if id := app.book.Identifier; id.Content != "" {
+	id := app.book.Identifier
+	if id.Content != "" {
 		return fmt.Sprintf("%s:%s", id.Scheme, id.Content)
-	} else {
-		app.warn("Book is missing identifier (e.g. ISBN); loading and saving reading progress may not work as expected.", "scheme", id.Scheme, "content", id.Content)
 	}
+
+	app.warn("Book is missing identifier (e.g. ISBN); loading and saving reading progress may not work as expected.", "scheme", id.Scheme, "content", id.Content)
 
 	return fmt.Sprintf("title:%s", app.book.Title)
 }

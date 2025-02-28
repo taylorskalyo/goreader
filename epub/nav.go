@@ -7,18 +7,18 @@ import (
 
 const idTOC = "toc"
 
+// NavDoc represents an EPUB 3.0 compatible navigation document.
 type NavDoc struct {
 	Nav []Nav `xml:"body>nav"`
 }
 
+// Nav represents a list of navigable items.
 type Nav struct {
 	Items []ListItem `xml:"ol>li"`
 }
 
-type List struct {
-	Items []ListItem `xml:"li"`
-}
-
+// ListItem represents a location within the epub file that can be navigated
+// to.
 type ListItem struct {
 	Link struct {
 		Href string `xml:"href,attr"`
@@ -54,6 +54,7 @@ func (r *Reader) setTOC() error {
 	return nil
 }
 
+// navItemName searches for the name of an item in a NavDoc document.
 func (rf Rootfile) navItemName(href string) string {
 	for _, nav := range rf.NavDoc.Nav {
 		for _, item := range nav.Items {
@@ -66,6 +67,7 @@ func (rf Rootfile) navItemName(href string) string {
 	return ""
 }
 
+// lookupItemName traverses a ListItem looking for the name of an item.
 func (li ListItem) lookupItemName(href string) string {
 	if li.Link.Href == href {
 		return li.Link.Text

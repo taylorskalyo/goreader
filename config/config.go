@@ -52,7 +52,7 @@ func (s Style) Merge(other Style) Style {
 	return s
 }
 
-// Strings renders a Style as a tview style tag.
+// String renders a Style as a tview style tag.
 func (s Style) String() string {
 	var b strings.Builder
 	b.WriteString("[")
@@ -92,6 +92,7 @@ func (s Style) String() string {
 // Keybindings maps key presses to actions.
 type Keybindings map[KeyChord]Action
 
+// lookup returns a list of KeyChords that are bound to the given action.
 func (k Keybindings) lookup(target Action) []KeyChord {
 	chords := []KeyChord{}
 	for chord, action := range k {
@@ -235,6 +236,8 @@ func Load() (*Config, error) {
 	return &config, err
 }
 
+// ReloadEnv re-reads XDG settings from environment variables and then
+// re-initializes config paths.
 func ReloadEnv() {
 	xdg.Reload()
 	configDir = xdg.ConfigHome

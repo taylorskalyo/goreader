@@ -91,6 +91,8 @@ func StoreProgress(id string, rs Progress) error {
 	return os.WriteFile(stateFile, data, 0644)
 }
 
+// ReloadEnv re-reads XDG settings from environment variables and then
+// re-initializes state paths.
 func ReloadEnv() {
 	xdg.Reload()
 	stateDir = xdg.StateHome

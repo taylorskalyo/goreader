@@ -65,6 +65,7 @@ func wsTransformSpace(text string) string {
 	return reTransformSpace.ReplaceAllString(text, " ")
 }
 
+// hasText returns true if the given string has visible non-space characters.
 func hasText(text string) bool {
 	if len(text) > 0 {
 		for _, r := range text {

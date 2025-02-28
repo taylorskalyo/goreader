@@ -122,6 +122,7 @@ func (kc KeyChord) String() string {
 	return strings.Join(keys, "+")
 }
 
+// modNames returns the names of available key modifiers.
 func (kc KeyChord) modNames() []string {
 	modNames := []string{}
 	for name, mod := range namedModifiers {

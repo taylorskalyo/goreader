@@ -8,7 +8,8 @@ import (
 )
 
 // wordWrapWriter wraps an io.Writer. As text is written, lines are wrapped at
-// a given width before being passed to the underlying Writer.
+// a given width before being passed to the underlying Writer. See
+// tview.WordWrap for the underlying word-wrapping logic.
 type wordWrapWriter struct {
 	w      io.Writer
 	width  int
@@ -22,6 +23,7 @@ func newWordWrapWriter(w io.Writer, width int) *wordWrapWriter {
 	}
 }
 
+// Write implements io.Write.
 func (w *wordWrapWriter) Write(p []byte) (n int, err error) {
 	w.buffer.Write(p)
 	lines := tview.WordWrap(w.buffer.String(), w.width)
@@ -44,6 +46,7 @@ func (w *wordWrapWriter) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
+// Flush writes any lines remaining in the buffer.
 func (w *wordWrapWriter) Flush() error {
 	if w.buffer.Len() > 0 {
 		_, err := w.w.Write([]byte(w.buffer.String()))

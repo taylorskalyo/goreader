@@ -1,11 +1,8 @@
 package render
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"image"
-	"image/color"
 	"io"
 	"strings"
 
@@ -13,7 +10,6 @@ import (
 	_ "image/png"
 
 	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/nfnt/resize"
 	"github.com/rivo/tview"
 	"github.com/taylorskalyo/goreader/config"
 	"github.com/taylorskalyo/goreader/epub"
@@ -256,189 +252,4 @@ func (r *Renderer) handleEndTag(token html.Token) (err error) {
 	}
 
 	return err
-}
-
-// columnConfigs configures columns to fit within the viewport. It sets each
-// column's max width and handles text wrapping.
-func (r *Renderer) columnConfigs(style table.Style) (configs []table.ColumnConfig) {
-	columnCount := 0
-	for _, row := range r.parser.rowStack {
-		if len(row) > columnCount {
-			columnCount = len(row)
-		}
-	}
-
-	if columnCount < 1 {
-		return configs
-	}
-
-	configs = make([]table.ColumnConfig, columnCount)
-
-	// Determine width used up by table decorations.
-	decorationWidth := 2 * columnCount // padding
-	if style.Options.DrawBorder {
-		decorationWidth += 2
-	}
-	if style.Options.SeparateColumns {
-		decorationWidth += columnCount - 1
-	}
-
-	// Determine width availble for text.
-	availableWidth := r.width - decorationWidth
-	for i := range configs {
-		configs[i] = table.ColumnConfig{
-			Number:           i + 1,
-			WidthMaxEnforcer: tviewWidthEnforcer,
-		}
-	}
-
-	// Dynamically choose column width.
-	strategies := []func(int, *[]table.ColumnConfig) bool{
-		r.parser.tryFitColumn,
-		r.parser.tryFairColumn,
-	}
-	for _, fn := range strategies {
-		if ok := fn(availableWidth, &configs); ok {
-			return configs
-		}
-	}
-
-	return []table.ColumnConfig{}
-}
-
-// tryFitColumn fits each column width to its cell content. If the overall
-// width is greater than the available width, it will abort.
-func (p *parser) tryFitColumn(availableWidth int, configs *[]table.ColumnConfig) bool {
-	maxWidths := make([]int, len(*configs))
-	for _, row := range p.rowStack {
-		for col, cell := range row {
-			if len(cell) > maxWidths[col] {
-				maxWidths[col] = len(cell)
-			}
-		}
-	}
-
-	totalMaxWidth := 0
-	for _, width := range maxWidths {
-		totalMaxWidth += width
-	}
-
-	if totalMaxWidth > availableWidth {
-		return false
-	}
-
-	for i := range *configs {
-		(*configs)[i].WidthMax = maxWidths[i]
-	}
-
-	return true
-}
-
-// tryFairColumn gives each column a proportion of the available width with a
-// bias towards equal widths.
-func (p *parser) tryFairColumn(availableWidth int, configs *[]table.ColumnConfig) bool {
-	equalWidth := availableWidth / len(*configs)
-	fairWidths := make([]int, len(*configs))
-	for _, row := range p.rowStack {
-		for col, cell := range row {
-			fairWidth := (len(cell) + equalWidth) / 2
-			if fairWidth > fairWidths[col] {
-				fairWidths[col] = fairWidth
-			}
-		}
-	}
-
-	totalFairWidth := 0
-	for _, width := range fairWidths {
-		totalFairWidth += width
-	}
-
-	for i := range *configs {
-		ratio := float64(fairWidths[i]) / float64(totalFairWidth)
-		width := int(float64(availableWidth) * ratio)
-		(*configs)[i].WidthMax = width
-	}
-
-	return true
-}
-
-// handleImage appends image elements to the parser buffer. It extracts alt
-// text and renders images.
-func (r *Renderer) handleImage(token html.Token) error {
-	for _, a := range token.Attr {
-		switch atom.Lookup([]byte(a.Key)) {
-		case atom.Alt:
-			text := fmt.Sprintf("Alt text: %s", a.Val)
-			r.parser.ensureNewlines(1)
-			if err := r.appendText(text); err != nil {
-				return err
-			}
-			r.parser.ensureNewlines(1)
-		case atom.Src:
-			if err := r.handleImageSrc(a.Val); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
-// handleImageSrc reads a referenced image and renders it to the parser buffer.
-func (r *Renderer) handleImageSrc(href string) error {
-	if r.parser.writeTarget() != r.parser.writer {
-		// NOTE: rendering images inside tables is not supported at the moment as
-		// this would add a lot of complexity.
-		return nil
-	}
-
-	for _, item := range r.content.Items {
-		if item.HREF == href {
-			for _, line := range imageToText(item, r.width) {
-				r.parser.ensureNewlines(1)
-				if err := r.appendText(line); err != nil {
-					return err
-				}
-				r.parser.ensureNewlines(1)
-			}
-			break
-		}
-	}
-
-	return nil
-}
-
-// imageToText renders an image as lines of text.
-func imageToText(item epub.Item, width int) []string {
-	lines := []string{}
-	r, err := item.Open()
-	if err != nil {
-		return lines
-	}
-
-	img, _, err := image.Decode(r)
-	if err != nil {
-		return lines
-	}
-	bounds := img.Bounds()
-
-	// Assume a character height to width ratio of 2:1.
-	h := (bounds.Max.Y * width) / (bounds.Max.X * 2)
-	img = resize.Resize(uint(width), uint(h), img, resize.Lanczos3)
-
-	charGradient := []rune("MND8OZ$7I?+=~:,..")
-	buf := new(bytes.Buffer)
-
-	for y := 0; y < h; y++ {
-		for x := 0; x < width; x++ {
-			c := color.GrayModel.Convert(img.At(x, y))
-			y := c.(color.Gray).Y
-			pos := (len(charGradient) - 1) * int(y) / 255
-			buf.WriteRune(charGradient[pos])
-		}
-		lines = append(lines, buf.String())
-		buf = new(bytes.Buffer)
-	}
-
-	return lines
 }
