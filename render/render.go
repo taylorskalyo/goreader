@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path"
 	"strings"
 
 	_ "image/jpeg"
@@ -39,6 +40,7 @@ type parser struct {
 	newlines  int
 	indents   int
 	writer    *wordWrapWriter
+	basepath  string
 }
 
 // New returns a new epub Renderer.
@@ -58,7 +60,8 @@ func (r *Renderer) SetTheme(theme config.Theme) {
 // RenderChapter reads in an epub item, parses the content, and writes the
 // rendered output to the given writer.
 func (r *Renderer) RenderChapter(ctx context.Context, chapter int, w io.Writer) error {
-	doc, err := r.content.Spine.Itemrefs[chapter].Open()
+	item := r.content.Spine.Itemrefs[chapter]
+	doc, err := item.Open()
 	if err != nil {
 		return err
 	}
@@ -66,6 +69,7 @@ func (r *Renderer) RenderChapter(ctx context.Context, chapter int, w io.Writer) 
 	r.parser = parser{
 		tokenizer: html.NewTokenizer(doc),
 		writer:    newWordWrapWriter(w, r.width),
+		basepath:  path.Dir(item.HREF),
 	}
 
 	return r.render(ctx)

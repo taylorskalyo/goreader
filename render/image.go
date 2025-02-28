@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"path"
 
 	"github.com/nfnt/resize"
 	"github.com/taylorskalyo/goreader/epub"
@@ -40,6 +41,10 @@ func (r *Renderer) handleImageSrc(href string) error {
 		// NOTE: rendering images inside tables is not supported at the moment as
 		// this would add a lot of complexity.
 		return nil
+	}
+
+	if !path.IsAbs(href) {
+		href = path.Join(r.parser.basepath, href)
 	}
 
 	for _, item := range r.content.Items {
