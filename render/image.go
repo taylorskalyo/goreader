@@ -6,6 +6,7 @@ import (
 	"image"
 	"image/color"
 	"path"
+	"sort"
 
 	"github.com/nfnt/resize"
 	"github.com/taylorskalyo/goreader/epub"
@@ -16,8 +17,17 @@ import (
 // handleImage appends image elements to the parser buffer. It extracts alt
 // text and renders images.
 func (r *Renderer) handleImage(token html.Token) error {
+	// Sort attributes so that image source is handled before image alt text.
+	sort.Slice(token.Attr, func(i, j int) bool {
+		return token.Attr[i].Key > token.Attr[j].Key
+	})
+
 	for _, a := range token.Attr {
 		switch atom.Lookup([]byte(a.Key)) {
+		case atom.Src:
+			if err := r.handleImageSrc(a.Val); err != nil {
+				return err
+			}
 		case atom.Alt:
 			text := fmt.Sprintf("Alt text: %s", a.Val)
 			r.parser.ensureNewlines(1)
@@ -25,10 +35,6 @@ func (r *Renderer) handleImage(token html.Token) error {
 				return err
 			}
 			r.parser.ensureNewlines(1)
-		case atom.Src:
-			if err := r.handleImageSrc(a.Val); err != nil {
-				return err
-			}
 		}
 	}
 
