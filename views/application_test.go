@@ -10,6 +10,7 @@ import (
 	"github.com/taylorskalyo/goreader/config"
 	"github.com/taylorskalyo/goreader/epub"
 	"github.com/taylorskalyo/goreader/state"
+	"golang.org/x/sync/errgroup"
 )
 
 type testScreen struct {
@@ -50,6 +51,8 @@ func newTestApp(t *testing.T) *Application {
 }
 
 func TestNavigation(t *testing.T) {
+	eg := new(errgroup.Group)
+
 	ts := newTestScreen(t)
 	app := newTestApp(t)
 	app.SetScreen(ts)
@@ -57,9 +60,7 @@ func TestNavigation(t *testing.T) {
 	rc, _ := epub.OpenReader("../epub/_test_files/alice.epub")
 	defer rc.Close()
 
-	go func() {
-		assert.NoError(t, app.Run())
-	}()
+	eg.Go(app.Run)
 
 	app.QueueUpdateDraw(func() {
 		ts.SetSize(80, 20)
@@ -123,4 +124,5 @@ func TestNavigation(t *testing.T) {
 	}
 
 	ts.InjectKey(tcell.KeyRune, 'q', tcell.ModNone)
+	assert.NoError(t, eg.Wait())
 }
