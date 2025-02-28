@@ -74,16 +74,6 @@ func (kc *KeyChord) UnmarshalText(text []byte) error {
 	*kc = KeyChord{}
 	keys := strings.Split(string(text), "+")
 
-	strKey := keys[len(keys)-1]
-	if key, ok := namedKeys[strings.ToLower(strKey)]; ok {
-		(*kc).Key = key
-	} else if runes := []rune(strKey); len(runes) == 1 {
-		(*kc).Key = tcell.KeyRune
-		(*kc).Rune = runes[0]
-	} else {
-		return fmt.Errorf("config: unrecognized keybind key \"%s\"", strKey)
-	}
-
 	strModifiers := keys[:len(keys)-1]
 	for _, strMod := range strModifiers {
 		if mod, ok := namedModifiers[strings.ToLower(strMod)]; ok {
@@ -91,6 +81,21 @@ func (kc *KeyChord) UnmarshalText(text []byte) error {
 		} else {
 			return fmt.Errorf("config: unrecognized keybind modifier \"%s\"", strMod)
 		}
+	}
+
+	strKey := keys[len(keys)-1]
+	ctrlKey := fmt.Sprintf("Ctrl-%s", strKey)
+	isCtrl := (*kc).ModMask&tcell.ModCtrl != 0
+	if key, ok := namedKeys[strings.ToLower(ctrlKey)]; ok && isCtrl {
+		(*kc).Key = key
+		(*kc).Rune = rune(key)
+	} else if key, ok := namedKeys[strings.ToLower(strKey)]; ok {
+		(*kc).Key = key
+	} else if runes := []rune(strKey); len(runes) == 1 {
+		(*kc).Key = tcell.KeyRune
+		(*kc).Rune = runes[0]
+	} else {
+		return fmt.Errorf("config: unrecognized keybind key \"%s\"", strKey)
 	}
 
 	return nil
@@ -107,7 +112,11 @@ func (kc KeyChord) String() string {
 	if kc.Key == tcell.KeyRune {
 		keys = append(keys, string(kc.Rune))
 	} else {
-		keys = append(keys, tcell.KeyNames[kc.Key])
+		name := tcell.KeyNames[kc.Key]
+		if kc.ModMask&tcell.ModCtrl != 0 && strings.HasPrefix(name, "Ctrl-") {
+			name = strings.ToLower(name[5:])
+		}
+		keys = append(keys, name)
 	}
 
 	return strings.Join(keys, "+")

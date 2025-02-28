@@ -58,6 +58,20 @@ func TestUnmarshal(t *testing.T) {
 			},
 		},
 		{
+			"KeyChordSpecialKeys",
+			[]byte(`keybindings:
+  "ctrl+c": Exit`),
+			Config{
+				Keybindings: Keybindings{
+					KeyChord{
+						Key:     tcell.KeyCtrlC,
+						ModMask: tcell.ModCtrl,
+						Rune:    3,
+					}: ActionExit,
+				},
+			},
+		},
+		{
 			"StyleColorVariations",
 			[]byte(`theme:
   em:

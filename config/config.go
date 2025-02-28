@@ -20,6 +20,10 @@ var (
 	ConfigFile   string
 )
 
+func init() {
+	ReloadEnv()
+}
+
 type Theme map[string]Style
 
 // Config stores configuration options.
