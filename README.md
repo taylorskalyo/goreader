@@ -4,12 +4,14 @@ Terminal epub reader
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/taylorskalyo/goreader)](https://goreportcard.com/report/github.com/taylorskalyo/goreader)
 
-Goreader is a minimal ereader application that runs in the terminal. Images are displayed as ASCII art. Commands are based on less.
+Goreader is an ereader application that runs in the terminal. Images are displayed as ASCII art. Commands are based on less.
+
+![screenshot](example/screenshot.png)
 
 ## Installation
 
 ``` shell
-go get github.com/taylorskalyo/goreader
+go install github.com/taylorskalyo/goreader
 ```
 
 ## Usage
@@ -18,18 +20,22 @@ go get github.com/taylorskalyo/goreader
 goreader [epub_file]
 ```
 
-### Keybindings
+### Default Keybindings
 
-| Key               | Action            |
+| Action            | Key               |
 | ----------------- | ----------------- |
-| `q` / Escape      | Quit              |
-| `k` / Up arrow    | Scroll up         |
-| `j` / Down arrow  | Scroll down       |
-| `h` / Left arrow  | Scroll left       |
-| `l` / Right arrow | Scroll right      |
-| `b`               | Previous page     |
-| `f`               | Next page         |
-| `H`               | Previous chapter  |
-| `L`               | Next chapter      |
-| `g`               | Top of chapter    |
-| `G`               | Bottom of chapter |
+| Exit              | `q` / Escape      |
+| Up                | `k` / Up arrow    |
+| Down              | `j` / Down arrow  |
+| Top               | `g` / Home        |
+| Bottom            | `G` / End         |
+| Backward          | `b` / PgUp        |
+| Forward           | `f` / PgDn        |
+| ChapterPrevious   | `H`               |
+| ChapterNext       | `L`               |
+
+## Configuration
+
+Custom keybindings and themes can be set by creating a config file at `$XDG_CONFIG_HOME/goreader/config.yml`.
+
+See [example/config.yml](example/config.yml) for an example configuration.

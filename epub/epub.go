@@ -5,15 +5,10 @@ package epub
 
 import (
 	"archive/zip"
-	"bytes"
-	"encoding/xml"
 	"errors"
 	"io"
 	"os"
-	"path"
 )
-
-const containerPath = "META-INF/container.xml"
 
 var (
 	// ErrNoRootfile occurs when there are no rootfile entries found in
@@ -47,70 +42,6 @@ type Reader struct {
 type ReadCloser struct {
 	Reader
 	f *os.File
-}
-
-// Rootfile contains the location of a content.opf package file.
-type Rootfile struct {
-	FullPath string `xml:"full-path,attr"`
-	Package
-}
-
-// Container serves as a directory of Rootfiles.
-type Container struct {
-	Rootfiles []*Rootfile `xml:"rootfiles>rootfile"`
-}
-
-// Package represents an epub content.opf file.
-type Package struct {
-	Metadata
-	Manifest
-	Spine
-}
-
-// Metadata contains publishing information about the epub.
-type Metadata struct {
-	Title       string `xml:"metadata>title"`
-	Language    string `xml:"metadata>language"`
-	Identifier  string `xml:"metadata>idenifier"`
-	Creator     string `xml:"metadata>creator"`
-	Contributor string `xml:"metadata>contributor"`
-	Publisher   string `xml:"metadata>publisher"`
-	Subject     string `xml:"metadata>subject"`
-	Description string `xml:"metadata>description"`
-	Event       []struct {
-		Name string `xml:"event,attr"`
-		Date string `xml:",innerxml"`
-	} `xml:"metadata>date"`
-	Type     string `xml:"metadata>type"`
-	Format   string `xml:"metadata>format"`
-	Source   string `xml:"metadata>source"`
-	Relation string `xml:"metadata>relation"`
-	Coverage string `xml:"metadata>coverage"`
-	Rights   string `xml:"metadata>rights"`
-}
-
-// Manifest lists every file that is part of the epub.
-type Manifest struct {
-	Items []Item `xml:"manifest>item"`
-}
-
-// Item represents a file stored in the epub.
-type Item struct {
-	ID        string `xml:"id,attr"`
-	HREF      string `xml:"href,attr"`
-	MediaType string `xml:"media-type,attr"`
-	f         *zip.File
-}
-
-// Spine defines the reading order of the epub documents.
-type Spine struct {
-	Itemrefs []Itemref `xml:"spine>itemref"`
-}
-
-// Itemref points to an Item.
-type Itemref struct {
-	IDREF string `xml:"idref,attr"`
-	*Item
 }
 
 // OpenReader will open the epub file specified by name and return a
@@ -169,112 +100,38 @@ func (r *Reader) init(z *zip.Reader) error {
 	if err != nil {
 		return err
 	}
+
 	err = r.setPackages()
 	if err != nil {
 		return err
 	}
+
 	err = r.setItems()
 	if err != nil {
 		return err
 	}
 
-	return nil
-}
-
-// setContainer unmarshals the epub's container.xml file.
-func (r *Reader) setContainer() error {
-	f, err := r.files[containerPath].Open()
+	err = r.setNCX()
 	if err != nil {
 		return err
 	}
 
-	var b bytes.Buffer
-	_, err = io.Copy(&b, f)
+	err = r.setTOC()
 	if err != nil {
 		return err
 	}
 
-	err = xml.Unmarshal(b.Bytes(), &r.Container)
-	if err != nil {
-		return err
-	}
-
-	if len(r.Container.Rootfiles) < 1 {
-		return ErrNoRootfile
-	}
-
 	return nil
 }
 
-// setPackages unmarshal's each of the epub's content.opf files.
-func (r *Reader) setPackages() error {
-	for _, rf := range r.Container.Rootfiles {
-		if r.files[rf.FullPath] == nil {
-			return ErrBadRootfile
-		}
-
-		f, err := r.files[rf.FullPath].Open()
-		if err != nil {
-			return err
-		}
-
-		var b bytes.Buffer
-		_, err = io.Copy(&b, f)
-		if err != nil {
-			return err
-		}
-
-		err = xml.Unmarshal(b.Bytes(), &rf.Package)
-		if err != nil {
-			return err
-		}
+// DefaultRendition selects the default rendition from a list of rootfiles of
+// an epub container.
+func (c *Container) DefaultRendition() *Rootfile {
+	if len(c.Rootfiles) < 1 {
+		return nil
 	}
 
-	return nil
-}
-
-// setItems associates Itemrefs with their respective Item and Items with
-// their zip.File.
-func (r *Reader) setItems() error {
-	itemrefCount := 0
-	for _, rf := range r.Container.Rootfiles {
-		itemMap := make(map[string]*Item)
-		for i := range rf.Manifest.Items {
-			item := &rf.Manifest.Items[i]
-			itemMap[item.ID] = item
-
-			abs := path.Join(path.Dir(rf.FullPath), item.HREF)
-			item.f = r.files[abs]
-		}
-
-		for i := range rf.Spine.Itemrefs {
-			itemref := &rf.Spine.Itemrefs[i]
-			itemref.Item = itemMap[itemref.IDREF]
-			if itemref.Item == nil {
-				return ErrBadItemref
-			}
-		}
-		itemrefCount += len(rf.Spine.Itemrefs)
-	}
-
-	if itemrefCount < 1 {
-		return ErrNoItemref
-	}
-
-	return nil
-}
-
-// Open returns a ReadCloser that provides access to the Items's contents.
-// Multiple items may be read concurrently.
-func (item *Item) Open() (r io.ReadCloser, err error) {
-	if item.f == nil {
-		return nil, ErrBadManifest
-	}
-
-	return item.f.Open()
-}
-
-// Close closes the epub file, rendering it unusable for I/O.
-func (rc *ReadCloser) Close() {
-	rc.f.Close()
+	// An epub file may contain multilpe renditions. In practice, there is often
+	// just one. For simplicity, select the first available.
+	return c.Rootfiles[0]
 }

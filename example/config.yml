@@ -1,0 +1,63 @@
+# This is an example config file for goreader.
+# goreader looks for a config file in $XDG_CONFIG_HOME/goreader/config.yml
+
+# Keybindings are configured by mapping a key sequence to an action.
+keybindings:
+  k: Up
+  j: Down
+  g: Top
+  G: Botom
+  b: Backward
+  f: Forward
+  H: ChapterPrevious
+  L: ChapterNext
+  q: Exit
+
+  Up: Up
+  Down: Down
+  Home: Top
+  End: Botom
+  PgUp: Backward
+  PgDn: Forward
+  Esc: Exit
+
+  # Modifier keys are also allowed. For example:
+  #"Ctrl+c": Exit
+
+# Themes are configured by mapping an HTML tag to style options. The following
+# style options are available:
+#
+# foreground: <color>
+# background: <color>
+# bold: <bool>
+# italic: <bool>
+# strikethrough: <bool>
+# underline: <bool>
+theme:
+  b:
+    bold: true
+  em:
+    bold: true
+  strong:
+    bold: true
+  i:
+    italic: true
+    foreground: olive
+  h1:
+    foreground: purple
+  h2:
+    foreground: navy
+  h3:
+    foreground: teal
+  h4:
+    foreground: teal
+  h5:
+    foreground: teal
+  h6:
+    foreground: teal
+  title:
+    # Colors can be defined using W3C color names or six hexadecimal digits
+    # following a hash tag (must be quoted if using the latter). Note that
+    # different terminals may display these colors differently.
+    #foreground: "#800000"
+    foreground: maroon
